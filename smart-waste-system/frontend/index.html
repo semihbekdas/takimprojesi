@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Akıllı Kampüs Atık Yönetim Sistemi</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="style.css?v=5"/>
+</head>
+<body>
+<div class="app">
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-left">
+            <span class="logo">🗑️</span>
+            <div>
+                <h1>Akıllı Kampüs Atık Yönetim Sistemi</h1>
+                <p class="subtitle">Gerçek Zamanlı İzleme &amp; Rota Optimizasyonu</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="badge live" id="status-badge">● CANLI</div>
+        </div>
+    </header>
+
+    <!-- STATS -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-icon">📦</div>
+            <div>
+                <div class="stat-value" id="total-bins">0</div>
+                <div class="stat-label">Toplam Kutu</div>
+            </div>
+        </div>
+        <div class="stat-card green">
+            <div class="stat-icon">🟢</div>
+            <div>
+                <div class="stat-value" id="normal-bins">0</div>
+                <div class="stat-label">Normal</div>
+            </div>
+        </div>
+        <div class="stat-card yellow">
+            <div class="stat-icon">🟡</div>
+            <div>
+                <div class="stat-value" id="warning-bins">0</div>
+                <div class="stat-label">Toplanmalı</div>
+            </div>
+        </div>
+        <div class="stat-card red">
+            <div class="stat-icon">🔴</div>
+            <div>
+                <div class="stat-value" id="critical-bins">0</div>
+                <div class="stat-label">Kritik</div>
+            </div>
+        </div>
+        <div class="stat-card blue">
+            <div class="stat-icon">🚛</div>
+            <div>
+                <div class="stat-value" id="worker-status-val">Depoda</div>
+                <div class="stat-label">Araç Durumu</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="controls-row">
+        <button class="btn primary" id="btn-auto-toggle">▶ Oto Simülasyon Başlat</button>
+        <button class="btn orange"  id="btn-worker">🚛 Görevliyi Gönder</button>
+        <button class="btn purple"  id="btn-route">🗺 Rota Göster</button>
+        <button class="btn gray"    id="btn-reset">↺ Sıfırla</button>
+        <div class="speed-control">
+            <label>Araç Hızı:</label>
+            <input type="range" id="speed-slider" min="1" max="5" value="3">
+            <span id="speed-label">Normal</span>
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main-layout">
+        <div id="map"></div>
+        <div class="sidebar">
+            <!-- Route panel -->
+            <div class="panel">
+                <div class="panel-title">🗺 Aktif Rota</div>
+                <div id="route-panel"><p class="muted">Rota bekleniyor...</p></div>
+            </div>
+            <!-- Bin list -->
+            <div class="panel">
+                <div class="panel-title">📋 Kutu Durumları</div>
+                <div id="bin-list"></div>
+            </div>
+            <!-- Log -->
+            <div class="panel">
+                <div class="panel-title">📟 Aktivite Logu</div>
+                <div id="log-panel"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="script.js?v=5"></script>
+</body>
+</html>
