@@ -1,9 +1,14 @@
+from datetime import datetime, timedelta
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import database
+import electronics_signal
 import seed_data
 import sensor_simulator
 import route_optimizer
+
+ELECTRONICS_DEFAULT_BIN = "B01"
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -137,6 +142,107 @@ def receive_external_data():
 def reset_system():
     seed_data.reset_bins()
     return jsonify({"message": "System reset to initial state"})
+
+
+@app.route('/api/electronics-signal', methods=['GET'])
+def electronics_signal_series():
+    """EEM LTspice ramp sinyalinin eşit aralıklı örneklerini döndürür.
+    Yan etkisiz; grafik veya slider için kullanılır."""
+    try:
+        samples = int(request.args.get('samples', 21))
+    except (TypeError, ValueError):
+        return jsonify({"error": "samples must be an integer"}), 400
+    if samples < 2 or samples > 1000:
+        return jsonify({"error": "samples must be between 2 and 1000"}), 400
+
+    t_min, t_max = electronics_signal.time_bounds()
+    return jsonify({
+        "source": "LTspice transient (Op-Amp comparator input)",
+        "threshold_voltage": electronics_signal.THRESHOLD_V,
+        "voltage_to_fill_factor": electronics_signal.VOLTAGE_TO_FILL,
+        "t_min": t_min,
+        "t_max": t_max,
+        "sample_count_in_file": electronics_signal.sample_count(),
+        "samples": electronics_signal.get_series(samples),
+    })
+
+
+@app.route('/api/electronics-signal/apply', methods=['POST'])
+def electronics_signal_apply():
+    """Belirtilen t anındaki sinyali tek bir kutuya uygular (default B01).
+    Slider modu: frontend t'yi değiştirir, biz DB'ye nokta nokta yazarız."""
+    payload = request.get_json(silent=True) or {}
+    bin_id = (payload.get('bin_id') or request.args.get('bin_id') or ELECTRONICS_DEFAULT_BIN)
+    raw_t = payload.get('t', request.args.get('t'))
+    if raw_t is None:
+        return jsonify({"error": "t (seconds) is required"}), 400
+    try:
+        t = float(raw_t)
+    except (TypeError, ValueError):
+        return jsonify({"error": "t must be a number"}), 400
+
+    t_min, t_max = electronics_signal.time_bounds()
+    if t < t_min or t > t_max:
+        return jsonify({"error": f"t must be between {t_min} and {t_max}"}), 400
+
+    if database.get_bin(bin_id) is None:
+        return jsonify({"error": f"bin_id '{bin_id}' not found"}), 404
+
+    voltage = electronics_signal.get_voltage_at(t)
+    fill_level = electronics_signal.to_fill_level(voltage)
+    data = {
+        "bin_id": bin_id,
+        "fill_level": fill_level,
+        "voltage": round(voltage, 3),
+        "alarm": 1 if fill_level >= 50 else 0,
+        "status": sensor_simulator.calculate_status(fill_level),
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+    }
+    _persist(data)
+    return jsonify({"mode": "electronics-apply", "t": t, "data": data})
+
+
+@app.route('/api/simulate/electronics', methods=['POST'])
+def simulate_electronics():
+    """Tüm 0–10 sn LTspice serisini tek seferde DB'ye yazar. Tek kutuya
+    uygulanır (default B01). Diğer kutular değişmez. Ölçüm geçmişine
+    samples kadar nokta düşer, kutunun mevcut durumu son örnek olur."""
+    payload = request.get_json(silent=True) or {}
+    bin_id = (payload.get('bin_id') or request.args.get('bin_id') or ELECTRONICS_DEFAULT_BIN)
+    try:
+        samples = int(payload.get('samples', request.args.get('samples', 21)))
+    except (TypeError, ValueError):
+        return jsonify({"error": "samples must be an integer"}), 400
+    if samples < 2 or samples > 200:
+        return jsonify({"error": "samples must be between 2 and 200"}), 400
+
+    if database.get_bin(bin_id) is None:
+        return jsonify({"error": f"bin_id '{bin_id}' not found"}), 404
+
+    series = electronics_signal.get_series(samples)
+    t_min, t_max = electronics_signal.time_bounds()
+    base = datetime.now() - timedelta(seconds=t_max - t_min)
+
+    written = []
+    for point in series:
+        timestamp = (base + timedelta(seconds=point["t"] - t_min)).isoformat(timespec="seconds")
+        data = {
+            "bin_id": bin_id,
+            "fill_level": point["fill_level"],
+            "voltage": point["voltage"],
+            "alarm": 1 if point["above_threshold"] else 0,
+            "status": sensor_simulator.calculate_status(point["fill_level"]),
+            "timestamp": timestamp,
+        }
+        _persist(data)
+        written.append(data)
+
+    return jsonify({
+        "mode": "electronics-bulk",
+        "bin_id": bin_id,
+        "count": len(written),
+        "final_state": written[-1],
+    })
 
 
 @app.route('/api/route', methods=['GET'])

@@ -36,6 +36,51 @@
 > `path_coordinates` alanı yol ağı (Ulaş) tamamlandığında eklenecektir.
 > `/api/worker*` ve `/api/roads` endpointleri Ulaş'ın sorumluluğundadır.
 
+## EEM Elektronik Sinyali (LTspice)
+
+EEM ekibinin LTspice transient çıkışı (`backend/data/electronics_signal.tsv`)
+0–10 saniye boyunca 0V → 5V rampa. Eşik 2.5V (5. saniyede), bu noktadan
+itibaren alarm=1. Sinyal **yalnızca B01 kutusuna** uygulanır; diğer 7 kutu
+random/step/demo modlarıyla çalışmaya devam eder.
+
+| Metot | Endpoint | Açıklama |
+|---|---|---|
+| GET  | `/api/electronics-signal?samples=N` | Sinyalden eşit aralıklı N örnek (default 21, max 1000). Yan etkisiz, grafik/slider için. |
+| POST | `/api/electronics-signal/apply` | Body veya query: `bin_id` (default B01), `t` (sn). t anındaki voltajı ve fill_level'ı kutuya uygular. |
+| POST | `/api/simulate/electronics?samples=N&bin_id=B01` | 0–10 sn arasından N örnek alıp B01'in geçmişine bulk yazar; mevcut durum son örnek olur. |
+
+### Mapping
+
+```
+fill_level = round(voltage * 20)   # 5V = 100%
+alarm      = 1 if fill_level >= 50 else 0
+status     = normal | needs_collection | critical
+```
+
+### Örnek: `GET /api/electronics-signal?samples=11`
+
+```json
+{
+  "source": "LTspice transient (Op-Amp comparator input)",
+  "threshold_voltage": 2.5,
+  "voltage_to_fill_factor": 20,
+  "t_min": 0.0, "t_max": 10.0,
+  "sample_count_in_file": 1201,
+  "samples": [
+    { "t": 0.0,  "voltage": 0.0, "fill_level": 0,   "above_threshold": false },
+    { "t": 5.0,  "voltage": 2.5, "fill_level": 50,  "above_threshold": true  },
+    { "t": 10.0, "voltage": 5.0, "fill_level": 100, "above_threshold": true  }
+  ]
+}
+```
+
+### Hata Kodları (EEM endpointleri)
+
+| Kod | Senaryo |
+|---|---|
+| 400 | `t` aralık dışı (sinyal 0–10 sn), `samples` 2–1000 dışı |
+| 404 | Bilinmeyen `bin_id` |
+
 ---
 
 ## Veri Şeması

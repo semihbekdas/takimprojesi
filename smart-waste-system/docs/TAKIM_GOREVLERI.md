@@ -12,10 +12,12 @@
 |---|---|---|
 | Backend (Flask + SQLite) | ✅ Çalışıyor, tüm Semih endpoint'leri canlı | Semih |
 | Sensor simulator (random / step / demo) | ✅ Üç mod ayrıldı | Semih |
-| API doğrulama (404 / 400) | ✅ `bin_id` ve `fill_level` kontrol ediliyor | Semih |
+| EEM LTspice sinyali entegrasyonu | ✅ B01 kutusuna uygulanır, 3 endpoint | Semih |
+| API doğrulama (404 / 400) | ✅ `bin_id`, `fill_level`, `t` kontrol ediliyor | Semih |
 | Veritabanı şeması + seed | ✅ İdempotent seed, `reset_bins()` ayrı | Semih |
 | Frontend HTML/CSS | ⚠️ Yeni tasarım var, ama JS uyumsuz | İshak |
 | Frontend JS davranışı | ❌ HTML id'lerinden 3 tanesi eşleşmiyor | İshak |
+| EEM sinyali için frontend slider | ❌ UI yok (B01 için 0–10 sn slider) | İshak |
 | Yol ağı (`road_network.py`) | ❌ Dosya yok | Ulaş |
 | Görevli servisi (`worker_service.py`) | ❌ Dosya yok | Ulaş |
 | `/api/roads`, `/api/worker*` | ❌ Endpoint yok (Ulaş modülleri hazır olunca eklenecek) | Ulaş + Semih |
@@ -34,6 +36,7 @@ Aşağıdaki maddeler **tamamlandı**, sizin tekrar yapmanıza gerek yok:
 - `sensor_simulator`: `generate_random_data`, `generate_step_data`, `generate_demo_distribution`, `calculate_status` ve geriye dönük uyumluluk için `generate_sensor_data`.
 - `route_optimizer.calculate_route` (Manhattan + en yakın komşu, boş giriş kontrolü ile).
 - Endpointler: `/api/health`, `/api/bins`, `/api/measurements`, `/api/collection-bins`, `/api/dashboard`, `/api/simulate`, `/api/simulate/random`, `/api/simulate/step`, `/api/simulate/demo`, `/api/simulate/<bin_id>`, `/api/external-data`, `/api/reset`, `/api/route`.
+- EEM LTspice entegrasyonu: `electronics_signal.py` modülü + 3 endpoint (`GET /api/electronics-signal`, `POST /api/electronics-signal/apply`, `POST /api/simulate/electronics`). Sadece B01 kutusuna uygulanır.
 - API dokümantasyonu: `docs/api_documentation.md` güncel.
 - Düzeltilen bug'lar:
   1. `seed_data.py` artık `database` modülünün bağlantısını kullanıyor (daha önce `backend/waste.db` ile `database/waste.db` farklı dosyalardı).
@@ -84,7 +87,19 @@ GELISTIRME_RAPORU planına göre demo akışı için ayrı butonlar isteniyor:
 - [ ] Popup içine doluluk progress bar ekle (`<div style="width:{fill}%">`).
 - [ ] Popup'a "Bu kutuyu sıfırla" butonu → `POST /api/external-data` ile `fill_level=0` gönder.
 
-### 2.5 Tarayıcı uyumluluğu
+### 2.5 EEM LTspice Sinyali UI (yeni)
+
+EEM ekibinin sağladığı LTspice transient çıkışını B01 kutusu üzerinden göstermek için:
+
+- [ ] Sayfaya küçük bir panel: "EEM Comparator Sinyali (B01)".
+- [ ] 0–10 saniye arası slider. `oninput` → `POST /api/electronics-signal/apply?bin_id=B01&t={value}`.
+- [ ] Slider üstünde mini bir voltaj-zaman grafiği (örn. `<canvas>` veya SVG polyline). Veri: `GET /api/electronics-signal?samples=51`. 2.5V eşik çizgisini yatay olarak göster.
+- [ ] "Tüm Sinyali Uygula" butonu → `POST /api/simulate/electronics?bin_id=B01&samples=21`. B01'in geçmişine 21 ölçüm yazar, son durumu kritik olur.
+- [ ] B01 marker'ı diğer kutulardan görsel olarak ayrılsın (örn. küçük "⚡ EEM" rozeti popup'ta).
+
+Rapor için katma değer: "Frontend EEM ekibinin gerçek LTspice çıkışını canlı tüketiyor" gösterimi.
+
+### 2.6 Tarayıcı uyumluluğu
 
 - [ ] Chrome / Firefox / Safari'de açıp marker rengi, animasyon, layout testi yap.
 - [ ] `index.html` içindeki `?v=5` cache buster'ı her commit'te artır ya da `?v={timestamp}` kullan.
