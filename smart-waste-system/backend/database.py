@@ -53,6 +53,35 @@ def get_all_bins():
     conn.close()
     return bins
 
+def get_bin(bin_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM bins WHERE bin_id = ?', (bin_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_status_counts():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT current_status, COUNT(*) AS c FROM bins GROUP BY current_status')
+    counts = {row['current_status']: row['c'] for row in cursor.fetchall()}
+    cursor.execute('SELECT COUNT(*) AS total FROM bins')
+    total = cursor.fetchone()['total']
+    cursor.execute('SELECT COUNT(*) AS total FROM measurements')
+    measurement_count = cursor.fetchone()['total']
+    cursor.execute('SELECT timestamp FROM measurements ORDER BY id DESC LIMIT 1')
+    last_row = cursor.fetchone()
+    conn.close()
+    return {
+        "total_bins": total,
+        "normal": counts.get('normal', 0),
+        "needs_collection": counts.get('needs_collection', 0),
+        "critical": counts.get('critical', 0),
+        "measurement_count": measurement_count,
+        "last_measurement_at": last_row['timestamp'] if last_row else None,
+    }
+
 def get_measurements():
     conn = get_db_connection()
     cursor = conn.cursor()

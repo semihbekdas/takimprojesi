@@ -1,3 +1,5 @@
+import database
+
 BINS = [
     ('B01', 'Mühendislik Fakültesi', 'Academic',  25, 75),
     ('B02', 'Kütüphane',             'Library',   50, 75),
@@ -9,14 +11,27 @@ BINS = [
     ('B08', 'Otopark / Merkez',      'Parking',   50, 50),
 ]
 
-import database
-
 def insert_initial_bins():
-    import sqlite3
-    conn = sqlite3.connect('waste.db')
+    conn = database.get_db_connection()
     c = conn.cursor()
-    c.execute("DELETE FROM bins")
+    c.execute("SELECT COUNT(*) FROM bins")
+    if c.fetchone()[0] > 0:
+        conn.close()
+        return
+    for bin_id, name, location, x, y in BINS:
+        c.execute("""
+            INSERT INTO bins (bin_id, name, location, x, y,
+                current_fill_level, current_voltage, current_alarm, current_status, last_updated)
+            VALUES (?, ?, ?, ?, ?, 10, 0.5, 0, 'normal', datetime('now'))
+        """, (bin_id, name, location, x, y))
+    conn.commit()
+    conn.close()
+
+def reset_bins():
+    conn = database.get_db_connection()
+    c = conn.cursor()
     c.execute("DELETE FROM measurements")
+    c.execute("DELETE FROM bins")
     for bin_id, name, location, x, y in BINS:
         c.execute("""
             INSERT INTO bins (bin_id, name, location, x, y,
@@ -28,5 +43,5 @@ def insert_initial_bins():
 
 if __name__ == '__main__':
     database.init_db()
-    insert_initial_bins()
-    print("Bins inserted with new campus coordinates.")
+    reset_bins()
+    print("Bins reset and inserted with campus coordinates.")

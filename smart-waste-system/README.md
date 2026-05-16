@@ -43,7 +43,26 @@ pip install -r requirements.txt
 ```bash
 cd backend
 python app.py
+# → http://127.0.0.1:5001
 ```
 
+İlk çalıştırmada `smart-waste-system/database/waste.db` otomatik oluşturulur ve 8 kutu seed edilir. Sonraki çalıştırmalarda mevcut veriler korunur.
+
 ## Running Frontend
-Open `frontend/index.html` in your browser.
+Cache sorunlarını önlemek için statik sunucu kullanın:
+```bash
+cd frontend
+python3 -m http.server 8000
+# → http://localhost:8000
+```
+
+## API Endpoints
+Tam endpoint listesi ve örnek yanıtlar için bkz. [docs/api_documentation.md](docs/api_documentation.md).
+
+Kısa özet:
+- `GET /api/health`, `GET /api/bins`, `GET /api/measurements`, `GET /api/dashboard`, `GET /api/collection-bins`
+- `POST /api/simulate/random | step | demo`, `POST /api/simulate/<bin_id>`, `POST /api/external-data`, `POST /api/reset`
+- `GET /api/route?start_x=&start_y=&start_name=`
+
+## Takım Görevleri
+Frontend (İshak) ve rota/yol-ağı (Ulaş) için açık iş listesi: [docs/TAKIM_GOREVLERI.md](docs/TAKIM_GOREVLERI.md).
