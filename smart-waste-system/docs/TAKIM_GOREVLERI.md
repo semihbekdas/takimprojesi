@@ -156,9 +156,31 @@ Ulaş modülleri PR olarak açtığında Semih 30 dk içinde endpoint'leri ekler
 | Ulaş | Test çıktılarını `docs/test_results.md` dosyasına ekle. |
 | Semih | Hata raporları gelirse backend tarafında bug fix. |
 
+### Demo Kabul Kriterleri (uçtan uca)
+
+1. Random/demo veri üretimi ile kutuların anlık doluluk verisi değişiyor.
+2. Çöp kutuları doluluğa göre yeşil/sarı/kırmızı olarak haritada güncelleniyor.
+3. Görevli araç hedef kutulara en kısa rota üzerinden gidiyor ve toplama yapıyor.
+4. Toplanan kutuların boşaltıldığı sisteme kaydediliyor ve yeşile dönüyor.
+5. Dashboard ve aktivite logu olaylarla eşzamanlı güncelleniyor.
+
 ---
 
-## 5. Bilinen Tuzaklar
+## 5. Bilinen Hatalar (Açık)
+
+| # | Hata | Sorumlu | Çözüm |
+|---|---|---|---|
+| H1 | Harita markerları bazen güncellenmiyor | İshak | Marker refresh ve cache buster (`?v=` artır). |
+| H3 | Görevli aktifken simülasyon çakışıyor | Ulaş | Worker state machine + frontend buton disable. |
+| H4 | Rota çizgisi simülasyon sonrası silinmiyor | İshak | Yeni rota öncesi eski `routeLayer`'ı `map.removeLayer` ile temizle. |
+| H5 | Araç düz çizgi ile gidiyor (yolu takip etmiyor) | Ulaş + İshak | Rota çıktısına `path_coordinates` ekle, frontend polyline'ı bu listeden çizsin. |
+| H6 | Tarayıcı cache eski `script.js` kullanıyor | İshak | `index.html` içindeki `?v=N` parametresini her UI değişikliğinde artır. |
+
+> H2 (`step.name` undefined) Semih tarafında çözüldü — bin satırı zaten `name` alanını döndürüyor.
+
+---
+
+## 6. Bilinen Tuzaklar
 
 1. **DB yolu**: `database.py` `database/waste.db` kullanıyor. Hiçbir dosyada `sqlite3.connect('waste.db')` gibi göreli yol KULLANMA — her zaman `database.get_db_connection()`.
 2. **Seed idempotent**: `insert_initial_bins()` sadece tablo boşsa ekler. Tüm verileri sıfırlamak için `seed_data.reset_bins()` veya `POST /api/reset`.
@@ -168,7 +190,7 @@ Ulaş modülleri PR olarak açtığında Semih 30 dk içinde endpoint'leri ekler
 
 ---
 
-## 6. İletişim
+## 7. İletişim
 
 - **Repo:** https://github.com/semihbekdas/takimprojesi
 - **Branch stratejisi:** Her geliştirici kendi branch'inde çalışır (`frontend-ishak`, `routing-ulas`), PR ile main'e merge.
