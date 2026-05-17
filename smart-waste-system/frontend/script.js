@@ -1,4 +1,5 @@
 const API_BASE = 'http://127.0.0.1:5001/api';
+const EEM_BIN_ID = 'B01';
 
 // ─── HARİTA KURULUMU ─────────────────────────────────────────────
 const map = L.map('map', { crs: L.CRS.Simple, minZoom: -2 });
@@ -10,25 +11,19 @@ let markers   = {};
 let routeLayer = null;
 
 // ─── İKONLAR ─────────────────────────────────────────────────────
-function makeDot(color, size = 20) {
+function makeDot(color, size = 20, extraClass = '') {
     return L.divIcon({
         className: '',
-        html: `<div style="
-            width:${size}px;height:${size}px;
-            background:${color};
-            border-radius:50%;
-            border:3px solid rgba(255,255,255,0.9);
-            box-shadow:0 0 8px ${color}88;
-        "></div>`,
+        html: `<div class="marker-dot ${extraClass}" style="width:${size}px;height:${size}px;background:${color};box-shadow:0 0 8px ${color}88;"></div>`,
         iconSize: [size, size],
         iconAnchor: [size/2, size/2]
     });
 }
 
 const icons = {
-    normal:           makeDot('#2ecc71'),
-    needs_collection: makeDot('#f39c12'),
-    critical:         makeDot('#e74c3c', 26)
+    normal:           makeDot('#2ecc71', 20, 'normal'),
+    needs_collection: makeDot('#f39c12', 20, 'needs'),
+    critical:         makeDot('#e74c3c', 26, 'critical')
 };
 
 // Depo markeri
@@ -61,6 +56,7 @@ const workerMarker = L.marker([0, 0], {
 workerMarker.bindPopup('<b>🚛 Atık Toplama Aracı</b><br>Depoda bekliyor');
 
 let workerBusy = false;
+let workerStepDelayMs = 60;
 
 // ─── LOG ──────────────────────────────────────────────────────────
 const logs = [];
@@ -68,7 +64,7 @@ function log(msg) {
     const t = new Date().toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
     logs.unshift(`[${t}] ${msg}`);
     if (logs.length > 30) logs.pop();
-    const el = document.getElementById('worker-log');
+    const el = document.getElementById('log-panel');
     if (el) el.innerHTML = logs.map(l => `<div class="log-entry">${l}</div>`).join('');
 }
 
@@ -88,7 +84,7 @@ function moveWorker(toX, toY, steps = 40) {
                 workerPos = { x: toX, y: toY };
                 resolve();
             }
-        }, 60);
+        }, workerStepDelayMs);
     });
 }
 
@@ -101,10 +97,10 @@ async function calculateRoute() {
 
         if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
 
-        const infoDiv = document.getElementById('route-info');
+        const infoDiv = document.getElementById('route-panel');
 
         if (!data.route || data.route.length === 0) {
-            infoDiv.innerHTML = `<h3>Rota Özeti</h3><p>✅ Toplanması gereken kutu yok.</p>`;
+            infoDiv.innerHTML = `<p>✅ Toplanması gereken kutu yok.</p>`;
             return;
         }
 
@@ -137,6 +133,8 @@ async function calculateRoute() {
 async function runWorkerCycle() {
     if (workerBusy) { log('⚠️ Araç zaten çalışıyor!'); return; }
     workerBusy = true;
+    const statusEl = document.getElementById('worker-status-val');
+    if (statusEl) statusEl.textContent = 'Turda';
 
     // Güncel kutuları çek
     let bins;
@@ -156,6 +154,7 @@ async function runWorkerCycle() {
         log('✅ Toplanacak kutu yok. Depoya dönülüyor...');
         await moveWorker(0, 0);
         workerMarker.setPopupContent('<b>🚛 Atık Toplama Aracı</b><br>Depoda bekliyor');
+        if (statusEl) statusEl.textContent = 'Depoda';
         workerBusy = false;
         return;
     }
@@ -220,7 +219,8 @@ async function runWorkerCycle() {
     workerMarker.setPopupContent('<b>🚛 Atık Toplama Aracı</b><br>Depoda bekliyor. Sonraki tur için hazır.');
     log('🏠 Araç depoya döndü.');
 
-    document.getElementById('route-info').innerHTML = `<h3>Rota Özeti</h3><p>✅ Tur tamamlandı.</p>`;
+    document.getElementById('route-panel').innerHTML = `<p>✅ Tur tamamlandı.</p>`;
+    if (statusEl) statusEl.textContent = 'Depoda';
     workerBusy = false;
 }
 
@@ -237,7 +237,8 @@ async function fetchBins() {
         lastBinData = signature;
 
         updateMap(bins);
-        updateStats(bins);
+        updateBinList(bins);
+        await fetchDashboard();
     } catch (err) {
         // sessiz
     }
@@ -250,47 +251,293 @@ function updateMap(bins) {
     bins.forEach(bin => {
         const icon = icons[bin.current_status] || icons['normal'];
         const statusLabel = { critical: '🔴 Kritik', needs_collection: '🟡 Toplanmalı', normal: '🟢 Normal' };
+        const eemBadge = bin.bin_id === EEM_BIN_ID ? '<span class="eem-badge">⚡ EEM</span>' : '';
+        const progress = `
+            <div class="progress">
+                <div class="progress-bar" style="width:${bin.current_fill_level}%"></div>
+            </div>
+        `;
 
         const popup = `
-            <b>📦 ${bin.bin_id} – ${bin.name}</b><br>
+            <b>📦 ${bin.bin_id} – ${bin.name}</b> ${eemBadge}<br>
             📍 ${bin.location}<br>
             🗑️ Doluluk: <b>%${bin.current_fill_level}</b><br>
+            ${progress}
             ⚡ Voltaj: ${bin.current_voltage}V<br>
             📊 Durum: ${statusLabel[bin.current_status] || bin.current_status}<br>
-            🕐 ${bin.last_updated}
+            🕐 ${bin.last_updated}<br>
+            <button class="btn-reset-bin" data-bin-id="${bin.bin_id}">Bu kutuyu sıfırla</button>
         `;
         markers[bin.bin_id] = L.marker([bin.y, bin.x], { icon }).bindPopup(popup).addTo(map);
     });
 }
 
-function updateStats(bins) {
-    let n = 0, w = 0, c = 0;
-    bins.forEach(b => {
-        if (b.current_status === 'normal') n++;
-        else if (b.current_status === 'needs_collection') w++;
-        else if (b.current_status === 'critical') c++;
-    });
-    document.getElementById('total-bins').innerText = bins.length;
-    document.getElementById('normal-bins').innerText = n;
-    document.getElementById('warning-bins').innerText = w;
-    document.getElementById('critical-bins').innerText = c;
+function updateStatsFromDashboard(dashboard) {
+    document.getElementById('total-bins').innerText = dashboard.total_bins ?? 0;
+    document.getElementById('normal-bins').innerText = dashboard.normal ?? 0;
+    document.getElementById('warning-bins').innerText = dashboard.needs_collection ?? 0;
+    document.getElementById('critical-bins').innerText = dashboard.critical ?? 0;
+
+    const badge = document.getElementById('status-badge');
+    if (!badge || !dashboard.last_measurement_at) return;
+    const last = new Date(dashboard.last_measurement_at);
+    if (Number.isNaN(last.getTime())) return;
+
+    const ageSec = (Date.now() - last.getTime()) / 1000;
+    badge.classList.remove('live', 'stale');
+    badge.classList.add(ageSec > 30 ? 'stale' : 'live');
 }
 
-async function runSimulation() {
+function updateBinList(bins) {
+    const container = document.getElementById('bin-list');
+    if (!container) return;
+    const statusLabel = { critical: 'Kritik', needs_collection: 'Toplanmalı', normal: 'Normal' };
+    const statusClass = { critical: 'status red', needs_collection: 'status yellow', normal: 'status green' };
+    container.innerHTML = bins.map(bin => `
+        <div class="bin-item">
+            <div class="bin-title">${bin.bin_id} – ${bin.name}</div>
+            <div class="bin-meta">
+                <span>%${bin.current_fill_level} doluluk</span>
+                <span class="${statusClass[bin.current_status] || 'status'}">${statusLabel[bin.current_status] || bin.current_status}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function fetchDashboard() {
     try {
-        await fetch(`${API_BASE}/simulate`, { method: 'POST' });
-        lastBinData = null; // zorla yenile
+        const r = await fetch(`${API_BASE}/dashboard`);
+        const dashboard = await r.json();
+        updateStatsFromDashboard(dashboard);
+    } catch {
+        // sessiz
+    }
+}
+
+async function runRandomSimulation() {
+    try {
+        await fetch(`${API_BASE}/simulate/random`, { method: 'POST' });
+        lastBinData = null;
         await fetchBins();
-        log('⚡ Simülasyon çalıştırıldı. Veriler güncellendi.');
+        log('⚡ Random simülasyon çalıştırıldı.');
     } catch (e) { console.error(e); }
 }
 
-// ─── BUTONLAR ────────────────────────────────────────────────────
-document.getElementById('btn-simulate').addEventListener('click', runSimulation);
-document.getElementById('btn-route').addEventListener('click', calculateRoute);
-document.getElementById('btn-worker').addEventListener('click', () => runWorkerCycle());
+async function runDemoSimulation() {
+    try {
+        await fetch(`${API_BASE}/simulate/demo`, { method: 'POST' });
+        lastBinData = null;
+        await fetchBins();
+        log('🎬 Demo verisi üretildi.');
+    } catch (e) { console.error(e); }
+}
+
+async function runStepSimulation() {
+    try {
+        await fetch(`${API_BASE}/simulate/step`, { method: 'POST' });
+        lastBinData = null;
+        await fetchBins();
+        log('⬆️ Step simülasyonu çalıştırıldı.');
+    } catch (e) { console.error(e); }
+}
+
+async function resetSystem() {
+    try {
+        await fetch(`${API_BASE}/reset`, { method: 'POST' });
+        lastBinData = null;
+        if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+        const routePanel = document.getElementById('route-panel');
+        if (routePanel) routePanel.innerHTML = `<p>Rota bekleniyor...</p>`;
+        await fetchBins();
+        log('↺ Sistem sıfırlandı.');
+    } catch (e) { console.error(e); }
+}
+
+function setWorkerSpeed(value) {
+    const speedVal = Number(value);
+    const delays = { 1: 120, 2: 90, 3: 60, 4: 45, 5: 30 };
+    workerStepDelayMs = delays[speedVal] || 60;
+    const labels = { 1: 'Yavaş', 2: 'Yavaş', 3: 'Normal', 4: 'Hızlı', 5: 'Çok Hızlı' };
+    const label = document.getElementById('speed-label');
+    if (label) label.textContent = labels[speedVal] || 'Normal';
+}
 
 // ─── OTOMATİK GÜNCELLEME ─────────────────────────────────────────
 fetchBins();
 setInterval(() => { lastBinData = null; fetchBins(); }, 3000); // her 3sn zorla kontrol
 log('🟢 Sistem hazır. Veriler bekleniyor...');
+
+map.on('popupopen', (e) => {
+    const root = e.popup.getElement();
+    if (!root) return;
+    const btn = root.querySelector('.btn-reset-bin');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        const binId = btn.getAttribute('data-bin-id');
+        if (!binId) return;
+        await resetBin(binId);
+    });
+});
+
+async function resetBin(binId) {
+    try {
+        await fetch(`${API_BASE}/external-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                bin_id: binId,
+                fill_level: 0,
+                timestamp: new Date().toISOString().slice(0, 19)
+            })
+        });
+        lastBinData = null;
+        await fetchBins();
+        log(`🧹 ${binId} sıfırlandı.`);
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function fetchEemSignal(samples = 51) {
+    try {
+        const r = await fetch(`${API_BASE}/electronics-signal?samples=${samples}`);
+        const data = await r.json();
+        renderEemChart(data);
+        initEemSlider(data);
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function renderEemChart(data) {
+    const canvas = document.getElementById('eem-chart');
+    if (!canvas || !data || !data.samples) return;
+    const ctx = canvas.getContext('2d');
+
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.clientWidth || 260;
+    const height = canvas.height || 120;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const samples = data.samples;
+    const tMin = data.t_min ?? 0;
+    const tMax = data.t_max ?? 10;
+    const vMax = 5;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Threshold line
+    const thresholdV = data.threshold_voltage ?? 2.5;
+    const thY = height - (thresholdV / vMax) * (height - 10) - 5;
+    ctx.strokeStyle = '#f39c12';
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, thY);
+    ctx.lineTo(width, thY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Signal line
+    ctx.strokeStyle = '#2ecc71';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    samples.forEach((p, i) => {
+        const x = ((p.t - tMin) / (tMax - tMin)) * (width - 10) + 5;
+        const y = height - (p.voltage / vMax) * (height - 10) - 5;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+}
+
+function initEemSlider(data) {
+    const slider = document.getElementById('eem-slider');
+    const meta = document.getElementById('eem-meta');
+    if (!slider || !meta || !data) return;
+
+    const tMin = data.t_min ?? 0;
+    const tMax = data.t_max ?? 10;
+    slider.min = tMin;
+    slider.max = tMax;
+    slider.step = 0.1;
+
+    let debounce = null;
+    slider.addEventListener('input', () => {
+        const t = Number(slider.value);
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(async () => {
+            try {
+                const r = await fetch(`${API_BASE}/electronics-signal/apply?bin_id=${EEM_BIN_ID}&t=${t}` , { method: 'POST' });
+                const res = await r.json();
+                const dataPoint = res.data || {};
+                meta.textContent = `t=${t.toFixed(1)}s · V=${(dataPoint.voltage ?? 0).toFixed(2)}V · %${dataPoint.fill_level ?? 0}`;
+                lastBinData = null;
+                await fetchBins();
+            } catch (e) {
+                console.error(e);
+            }
+        }, 150);
+    });
+}
+
+async function applyFullEemSignal() {
+    try {
+        await fetch(`${API_BASE}/simulate/electronics?bin_id=${EEM_BIN_ID}&samples=21`, { method: 'POST' });
+        lastBinData = null;
+        await fetchBins();
+        log('⚡ EEM sinyali B01 için uygulandı.');
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+const eemApplyAllBtn = document.getElementById('btn-eem-apply-all');
+if (eemApplyAllBtn) eemApplyAllBtn.addEventListener('click', applyFullEemSignal);
+
+fetchEemSignal();
+
+// ─── BUTONLAR ────────────────────────────────────────────────────
+let autoSimTimer = null;
+const autoToggleBtn = document.getElementById('btn-auto-toggle');
+if (autoToggleBtn) {
+    autoToggleBtn.addEventListener('click', async () => {
+        if (autoSimTimer) {
+            clearInterval(autoSimTimer);
+            autoSimTimer = null;
+            autoToggleBtn.textContent = '▶ Oto Simülasyon Başlat';
+            log('⏸ Oto simülasyon durduruldu.');
+            return;
+        }
+        await runRandomSimulation();
+        autoSimTimer = setInterval(runRandomSimulation, 3000);
+        autoToggleBtn.textContent = '⏸ Oto Simülasyon Durdur';
+        log('▶ Oto simülasyon başlatıldı (3 sn).');
+    });
+}
+
+const demoBtn = document.getElementById('btn-demo');
+if (demoBtn) demoBtn.addEventListener('click', runDemoSimulation);
+
+const randomBtn = document.getElementById('btn-random');
+if (randomBtn) randomBtn.addEventListener('click', runRandomSimulation);
+
+const stepBtn = document.getElementById('btn-step');
+if (stepBtn) stepBtn.addEventListener('click', runStepSimulation);
+
+const routeBtn = document.getElementById('btn-route');
+if (routeBtn) routeBtn.addEventListener('click', calculateRoute);
+
+const workerBtn = document.getElementById('btn-worker');
+if (workerBtn) workerBtn.addEventListener('click', () => runWorkerCycle());
+
+const resetBtn = document.getElementById('btn-reset');
+if (resetBtn) resetBtn.addEventListener('click', resetSystem);
+
+const speedSlider = document.getElementById('speed-slider');
+if (speedSlider) {
+    setWorkerSpeed(speedSlider.value);
+    speedSlider.addEventListener('input', (e) => setWorkerSpeed(e.target.value));
+}
+

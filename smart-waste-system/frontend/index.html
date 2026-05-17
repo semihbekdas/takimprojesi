@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Akıllı Kampüs Atık Yönetim Sistemi</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <link rel="stylesheet" href="style.css?v=5"/>
+    <link rel="stylesheet" id="app-style" href="style.css"/>
 </head>
 <body>
 <div class="app">
@@ -66,6 +66,9 @@
     <!-- CONTROLS -->
     <div class="controls-row">
         <button class="btn primary" id="btn-auto-toggle">▶ Oto Simülasyon Başlat</button>
+        <button class="btn orange"  id="btn-demo">🎬 Demo Verisi Üret</button>
+        <button class="btn orange"  id="btn-random">🎲 Random Veri Üret</button>
+        <button class="btn orange"  id="btn-step">⬆️ Step (Doluluğu Artır)</button>
         <button class="btn orange"  id="btn-worker">🚛 Görevliyi Gönder</button>
         <button class="btn purple"  id="btn-route">🗺 Rota Göster</button>
         <button class="btn gray"    id="btn-reset">↺ Sıfırla</button>
@@ -90,6 +93,16 @@
                 <div class="panel-title">📋 Kutu Durumları</div>
                 <div id="bin-list"></div>
             </div>
+            <!-- EEM panel -->
+            <div class="panel eem-panel">
+                <div class="panel-title">⚡ EEM Comparator Sinyali (B01)</div>
+                <canvas id="eem-chart" height="120"></canvas>
+                <div class="eem-controls">
+                    <input type="range" id="eem-slider" min="0" max="10" step="0.1" value="0">
+                    <div class="eem-meta" id="eem-meta">t=0.0s · V=0.00V · %0</div>
+                    <button class="btn purple" id="btn-eem-apply-all">Tüm Sinyali Uygula</button>
+                </div>
+            </div>
             <!-- Log -->
             <div class="panel">
                 <div class="panel-title">📟 Aktivite Logu</div>
@@ -101,6 +114,17 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="script.js?v=5"></script>
+<script>
+    (function () {
+        var v = Date.now();
+        var style = document.getElementById('app-style');
+        if (style) {
+            style.href = 'style.css?v=' + v;
+        }
+        var appScript = document.createElement('script');
+        appScript.src = 'script.js?v=' + v;
+        document.body.appendChild(appScript);
+    })();
+</script>
 </body>
 </html>
