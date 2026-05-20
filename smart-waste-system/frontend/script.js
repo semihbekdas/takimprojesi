@@ -212,15 +212,7 @@ async function runWorkerCycle() {
         workerMarker.setPopupContent(`<b>🚛 Toplama Yapılıyor</b><br>${target.bin_id} – ${target.name}`);
 
         try {
-            await fetch(`${API_BASE}/external-data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    bin_id: target.bin_id,
-                    fill_level: 0,
-                    timestamp: new Date().toISOString().slice(0, 19),
-                }),
-            });
+            await fetch(`${API_BASE}/worker/collect/${target.bin_id}`, { method: 'POST' });
         } catch { /* sessiz */ }
 
         await new Promise(r => setTimeout(r, 600));
@@ -385,6 +377,7 @@ async function runStepSimulation() {
 async function resetSystem() {
     try {
         await fetch(`${API_BASE}/reset`, { method: 'POST' });
+        await fetch(`${API_BASE}/worker/reset`, { method: 'POST' });
         lastBinData = null;
         if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
         const routePanel = document.getElementById('route-panel');
@@ -619,4 +612,3 @@ if (speedSlider) {
     setWorkerSpeed(speedSlider.value);
     speedSlider.addEventListener('input', (e) => setWorkerSpeed(e.target.value));
 }
-

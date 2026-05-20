@@ -186,17 +186,24 @@ def calculate_real_road_route(bins, start_x=0, start_y=0, start_name="Depo"):
     route = []
     full_road_path = []
     total_distance = 0
+    status_priority = {"critical": 0, "needs_collection": 1, "normal": 2}
 
     while remaining:
         best_bin = None
         best_path = None
         best_distance = float("inf")
+        best_priority = float("inf")
 
         for bin_item in remaining:
             target_node = get_bin_road_node(bin_item)
             path_result = dijkstra_shortest_path(current_node, target_node)
+            priority = status_priority.get(bin_item["current_status"], 99)
 
-            if path_result["distance"] < best_distance:
+            if (
+                priority < best_priority
+                or (priority == best_priority and path_result["distance"] < best_distance)
+            ):
+                best_priority = priority
                 best_distance = path_result["distance"]
                 best_path = path_result
                 best_bin = bin_item
