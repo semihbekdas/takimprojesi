@@ -4,9 +4,11 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import database
 import electronics_signal
+import road_network
+import route_optimizer
 import seed_data
 import sensor_simulator
-import route_optimizer
+from worker_service import worker_service
 
 ELECTRONICS_DEFAULT_BIN = "B01"
 
@@ -257,6 +259,80 @@ def get_route():
     start = {"x": start_x, "y": start_y, "name": start_name}
     bins = database.get_bins_for_collection()
     return jsonify(route_optimizer.calculate_route(bins, start=start))
+
+
+# ─── ROAD NETWORK & WORKER (Ulaş'ın modülleri) ───────────────────────
+
+@app.route('/api/route/road', methods=['GET'])
+def get_road_route():
+    """Yol ağı üzerinden Dijkstra ile rota. Düz Manhattan yerine gerçek
+    yolu takip eder; çıktıda `road_path` (waypoint listesi) ve her durak
+    için `path_nodes_from_previous` döner."""
+    try:
+        start_x = float(request.args.get('start_x', 0))
+        start_y = float(request.args.get('start_y', 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "start_x and start_y must be numbers"}), 400
+    start_name = request.args.get('start_name', 'Depo')
+
+    bins = database.get_all_bins()
+    return jsonify(road_network.calculate_real_road_route(
+        bins=bins,
+        start_x=start_x,
+        start_y=start_y,
+        start_name=start_name,
+    ))
+
+
+@app.route('/api/roads', methods=['GET'])
+def get_roads():
+    """Yol ağının node ve edge bilgisi. Frontend bunu kullanıp harita
+    üstüne yolları çizebilir."""
+    return jsonify({
+        "nodes": road_network.ROAD_NODES,
+        "edges": road_network.ROAD_EDGES,
+        "bin_node_map": road_network.BIN_NODE_MAP,
+    })
+
+
+@app.route('/api/worker/status', methods=['GET'])
+def worker_status():
+    return jsonify(worker_service.get_status())
+
+
+@app.route('/api/worker/route', methods=['GET'])
+def worker_route():
+    bins = database.get_all_bins()
+    return jsonify(worker_service.create_route(bins))
+
+
+@app.route('/api/worker/start', methods=['POST'])
+def worker_start():
+    bins = database.get_all_bins()
+    return jsonify(worker_service.start_route(bins))
+
+
+@app.route('/api/worker/collect/<bin_id>', methods=['POST'])
+def worker_collect(bin_id):
+    if database.get_bin(bin_id) is None:
+        return jsonify({"error": f"bin_id '{bin_id}' not found"}), 404
+    result = worker_service.complete_bin(bin_id)
+    # Worker'ın işaretlediği kutuyu DB tarafında da sıfırla
+    payload = {
+        "bin_id": bin_id,
+        "fill_level": 0,
+        "voltage": 0.0,
+        "alarm": 0,
+        "status": "normal",
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+    }
+    _persist(payload)
+    return jsonify(result)
+
+
+@app.route('/api/worker/reset', methods=['POST'])
+def worker_reset():
+    return jsonify(worker_service.reset_worker())
 
 
 if __name__ == '__main__':

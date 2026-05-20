@@ -15,13 +15,14 @@
 | EEM LTspice sinyali entegrasyonu | ✅ B01 kutusuna uygulanır, 3 endpoint | Semih |
 | API doğrulama (404 / 400) | ✅ `bin_id`, `fill_level`, `t` kontrol ediliyor | Semih |
 | Veritabanı şeması + seed | ✅ İdempotent seed, `reset_bins()` ayrı | Semih |
-| Frontend HTML/CSS | ⚠️ Yeni tasarım var, ama JS uyumsuz | İshak |
-| Frontend JS davranışı | ❌ HTML id'lerinden 3 tanesi eşleşmiyor | İshak |
-| EEM sinyali için frontend slider | ❌ UI yok (B01 için 0–10 sn slider) | İshak |
-| Yol ağı (`road_network.py`) | ❌ Dosya yok | Ulaş |
-| Görevli servisi (`worker_service.py`) | ❌ Dosya yok | Ulaş |
-| `/api/roads`, `/api/worker*` | ❌ Endpoint yok (Ulaş modülleri hazır olunca eklenecek) | Ulaş + Semih |
-| Test dosyaları (`test_api.py`) | ❌ Yok | Ulaş |
+| Frontend HTML/CSS | ✅ İd uyumsuzlukları giderildi, EEM paneli eklendi | İshak |
+| Frontend JS davranışı | ✅ Tüm butonlar (demo/random/step/reset/worker/route/auto) çalışıyor | İshak |
+| EEM sinyali için frontend slider | ✅ Canvas grafiği + eşik çizgisi + slider + "Tüm Sinyali Uygula" | İshak |
+| Yol ağı (`road_network.py`) | ✅ 9 node + Dijkstra + `road_path` çıktısı | Ulaş |
+| Görevli servisi (`worker_service.py`) | ✅ State machine (idle/working/collecting), singleton | Ulaş |
+| `/api/roads`, `/api/route/road`, `/api/worker*` | ✅ 7 endpoint bağlandı (Semih) | Ulaş + Semih |
+| Test dosyaları (`test_api.py`) | ✅ 9 testin tümü PASS | Ulaş |
+| Frontend `/api/route/road`'a geçişi | ❌ Hâlâ düz `/api/route` çağırıyor (H5) | İshak |
 
 ---
 
@@ -37,6 +38,7 @@ Aşağıdaki maddeler **tamamlandı**, sizin tekrar yapmanıza gerek yok:
 - `route_optimizer.calculate_route` (Manhattan + en yakın komşu, boş giriş kontrolü ile).
 - Endpointler: `/api/health`, `/api/bins`, `/api/measurements`, `/api/collection-bins`, `/api/dashboard`, `/api/simulate`, `/api/simulate/random`, `/api/simulate/step`, `/api/simulate/demo`, `/api/simulate/<bin_id>`, `/api/external-data`, `/api/reset`, `/api/route`.
 - EEM LTspice entegrasyonu: `electronics_signal.py` modülü + 3 endpoint (`GET /api/electronics-signal`, `POST /api/electronics-signal/apply`, `POST /api/simulate/electronics`). Sadece B01 kutusuna uygulanır.
+- Ulaş'ın modüllerini app.py'a sarmalama (§3.4): `GET /api/route/road`, `GET /api/roads`, `GET /api/worker/status`, `GET /api/worker/route`, `POST /api/worker/start`, `POST /api/worker/collect/<bin_id>`, `POST /api/worker/reset`.
 - API dokümantasyonu: `docs/api_documentation.md` güncel.
 - Düzeltilen bug'lar:
   1. `seed_data.py` artık `database` modülünün bağlantısını kullanıyor (daha önce `backend/waste.db` ile `database/waste.db` farklı dosyalardı).
@@ -48,10 +50,9 @@ Aşağıdaki maddeler **tamamlandı**, sizin tekrar yapmanıza gerek yok:
 
 ## 2. İshak — Frontend
 
-> **Öncelik düzeni:** P0 (demo açılmıyorsa) → P1 (demo akar ama eksik) → P2 (cila).
-> **Tahmini süre:** P0 ≈ 1 gün, P1 ≈ 2 gün, P2 ≈ 1 gün.
+> **Durum:** P0 + P1'in büyük çoğunluğu tamam. Geriye sadece §2.7 (rotayı yol ağına bağlama) ve §2.6 (tarayıcı testi) kaldı.
 
-### 2.1 [P0] HTML ve JS uyumsuzluğunu düzelt
+### 2.1 [P0] HTML ve JS uyumsuzluğunu düzelt ✅
 
 [frontend/script.js](../frontend/script.js) ile [frontend/index.html](../frontend/index.html) arasında **id eşleşmeyen** elemanlar var. Sayfa şu anda butonları dinlemiyor ve loglar görünmüyor.
 
@@ -69,7 +70,7 @@ Ayrıca bu butonlara işlev gerekiyor:
 - [ ] `speed-slider` — `moveWorker` içindeki `setInterval(t, 60)` gecikmesini slider değerine göre ölçekle (1 = yavaş, 5 = hızlı).
 - [ ] `bin-list` — `/api/bins` sonucundan kart listesi üret (her kutu için bin_id, name, doluluk, durum rozeti).
 
-### 2.2 [P0] Demo butonları
+### 2.2 [P0] Demo butonları ✅
 
 GELISTIRME_RAPORU planına göre demo akışı için ayrı butonlar isteniyor:
 
@@ -77,20 +78,20 @@ GELISTIRME_RAPORU planına göre demo akışı için ayrı butonlar isteniyor:
 - [ ] **"Random Veri Üret"** butonu → `POST /api/simulate/random`.
 - [ ] **"Step (Doluluğu Artır)"** butonu → `POST /api/simulate/step`. Her tıklamada doluluk 3–12 puan artar.
 
-### 2.3 [P1] Dashboard kartları
+### 2.3 [P1] Dashboard kartları ✅
 
 Şu anda kart sayıları `fetchBins()` içinde hesaplanıyor. Daha temiz olanı:
 
 - [ ] `GET /api/dashboard` çağırıp `total_bins`, `normal`, `needs_collection`, `critical`, `collection_queue`, `measurement_count`, `last_measurement_at` değerlerini doğrudan göster.
 - [ ] Header'daki "● CANLI" rozetini son ölçüm zamanı 30 saniyeden eskiyse soluk göster.
 
-### 2.4 [P1] Marker ve popup iyileştirmeleri
+### 2.4 [P1] Marker ve popup iyileştirmeleri ✅
 
 - [ ] Kritik (kırmızı) marker için yanıp sönen halka efekti (CSS animation).
 - [ ] Popup içine doluluk progress bar ekle (`<div style="width:{fill}%">`).
 - [ ] Popup'a "Bu kutuyu sıfırla" butonu → `POST /api/external-data` ile `fill_level=0` gönder.
 
-### 2.5 [P1] EEM LTspice Sinyali UI
+### 2.5 [P1] EEM LTspice Sinyali UI ✅
 
 EEM ekibinin sağladığı LTspice transient çıkışını B01 kutusu üzerinden göstermek için:
 
@@ -105,78 +106,76 @@ Rapor için katma değer: "Frontend EEM ekibinin gerçek LTspice çıkışını 
 ### 2.6 [P2] Tarayıcı uyumluluğu
 
 - [ ] Chrome / Firefox / Safari'de açıp marker rengi, animasyon, layout testi yap.
-- [ ] `index.html` içindeki `?v=5` cache buster'ı her commit'te artır ya da `?v={timestamp}` kullan.
+- [x] Cache buster otomatik (`?v={Date.now()}`) — `index.html` script blok'unda.
+
+### 2.7 [P1] Rotayı yol ağına bağla — YENİ
+
+Ulaş'ın yol ağı endpoint'i artık canlı (`GET /api/route/road`). Frontend hâlâ düz çizgi rotaya (`/api/route`) çağrı atıyor. Geçiş yapılmalı (Bilinen Hata H5'in çözümü):
+
+- [ ] [script.js:94](../frontend/script.js#L94) — `${API_BASE}/route?...` → `${API_BASE}/route/road?...`.
+- [ ] Yanıttaki `data.road_path` listesini latlng dizisine çevir. Her waypoint `{node_id, name, x, y}` formatında.
+- [ ] `L.polyline(roadPathLatLngs, ...)` — kesik çizgi yerine düz, solid renkli çiz.
+- [ ] Worker animasyonu da `road_path` üstünden gitsin (`moveWorker` artık tek hedefe değil, ara waypoint'lere sırayla hareket etmeli).
+- [ ] Opsiyonel: `GET /api/roads` ile yol ağını arka plan olarak göster (gri ince çizgiler).
 
 ---
 
 ## 3. Ulaş — Yol Ağı, Rota Optimizasyonu, Görevli Servisi
 
-> **Öncelik düzeni:** P0 (worker akmıyor) → P1 (yol takip yok) → P2 (test+demo polish).
-> **Tahmini süre:** P0 ≈ 1.5 gün, P1 ≈ 1.5 gün, P2 ≈ 1 gün.
-> **Koordinasyon:** Önce kendi modüllerini yaz, sonra Semih endpoint sarmalayıcılarını ekler (≈ 30 dk).
+> **Durum:** P0 + P1 büyük ölçüde tamam. Geriye sadece frontend'in `/api/route/road`'a geçirilmesi (İshak §2.7) ve isteğe bağlı iyileştirmeler kaldı.
 
-### 3.1 [P1] `road_network.py`
+### 3.1 [P1] `road_network.py` ✅
 
-- [ ] `backend/road_network.py` oluştur.
-- [ ] Node listesi: yol kesişimleri (örn. `(0,0)` depo, `(25,0)`, `(50,0)`, `(75,0)`, `(0,25)`, ..., `(75,75)`).
-- [ ] Edge listesi: hangi node hangi node ile bağlı (yol var mı?).
-- [ ] Her kutuya en yakın node'u eşle: `bin_to_node = {"B01": (25, 75), ...}`.
-- [ ] `get_road_network() -> {"nodes": [...], "edges": [...]}` fonksiyonu.
-- [ ] `shortest_path(from_node, to_node) -> [list of nodes]` — Dijkstra ya da BFS (grid uniform-cost ise BFS yeterli).
+- [x] `backend/road_network.py` (276 satır, 9 node + 9 edge).
+- [x] `ROAD_NODES`, `ROAD_EDGES`, `BIN_NODE_MAP` tanımlı.
+- [x] `find_nearest_node(x, y)` — Öklid mesafesiyle en yakın node.
+- [x] `dijkstra_shortest_path(start, target)` — heapq ile en kısa yol.
+- [x] Bonus: `calculate_real_road_route(bins, start_x, start_y, start_name)` — kutu sıralı tam rota.
 
-### 3.2 [P1] Rota algoritmasını yol ağı üzerinden çalıştır
+### 3.2 [P1] Rota algoritmasını yol ağı üzerinden çalıştır ✅
 
-Şu anki `route_optimizer.calculate_route` düz Manhattan mesafesi kullanıyor; gerçek yol takip etmiyor.
+- [x] `calculate_real_road_route` Dijkstra ile gerçek yol uzunluğunu hesaplıyor.
+- [x] Çıktıda `road_path` (waypoint listesi) ve her durakta `path_nodes_from_previous` var → frontend polyline doğrudan bunu kullanabilir.
+- [x] Önceliklendirme: `filter_bins_for_collection` kritik + sarı kutuları döndürür; nearest-neighbor sırası ile geziliyor.
+- [ ] **İyileştirme** (opsiyonel): Aynı listede önce tüm kritikler, sonra sarılar gezilsin. Şu an saf en yakın komşu çalışıyor — bazı senaryolarda sarı kutu önce gelebilir.
 
-- [ ] Yeni fonksiyon: `calculate_route_on_roads(bins, start, road_network)`.
-- [ ] Her segment için Dijkstra'dan gerçek yol uzunluğunu al, toplam mesafeyi onunla hesapla.
-- [ ] Çıktıya `path_coordinates: [{"x":..,"y":..}, ...]` ekle — frontend'in polyline çizimi bunu kullanacak.
-- [ ] Kritik (kırmızı) kutulara `needs_collection` (sarı) kutulardan önce öncelik ver. Aynı sınıf içinde en yakın komşu kuralı geçerli.
+### 3.3 [P0] `worker_service.py` ✅
 
-### 3.3 [P0] `worker_service.py`
+- [x] `backend/worker_service.py` (168 satır, WorkerService class + singleton).
+- [x] State: `{id, name, x, y, status (idle/working/collecting/route_ready), current_target, completed_bins, last_route, last_updated}`.
+- [x] `get_status()`, `reset_worker()`, `create_route(bins)`, `start_route(bins)`, `move_to_bin(data)`, `complete_bin(bin_id)`, `finish_route()`, `simulate_full_worker_cycle(bins)`.
 
-Görevli aracın durum makinesini backend'e taşı.
+### 3.4 [P1] Semih ile birlikte: Worker / Roads endpoint'leri ✅
 
-- [ ] `backend/worker_service.py` oluştur.
-- [ ] State: `{"position": {"x":0,"y":0}, "status": "idle|moving|collecting", "target_bin_id": None|"B0X", "collected_count": 0}`.
-- [ ] `get_state()` — mevcut durumu döndürür.
-- [ ] `mark_collected(bin_id)` — kutuyu %0–10 arası sıfırlayıp `collected_count`'u artırır, sonraki hedefe geçer. **Not:** Şu anda frontend bunu `POST /api/external-data` ile `fill_level=0` yollayarak yapıyor; sen modülü yazana kadar bu çalışır.
-- [ ] `reset_to_depot()` — pozisyonu (0,0)'a alır, status idle.
-- [ ] B01 özel durumu: Eğer kutu EEM sinyali ile dolduysa (`/api/electronics-signal/apply`), toplama sonrası EEM'in t=0 değerini de uygulamak isteyebilirsin (`POST /api/electronics-signal/apply?t=0`). Tartışılır.
+Modüller `app.py`'a bağlandı. Tam liste:
 
-### 3.4 [P1] Semih ile birlikte: Worker / Roads endpoint'leri
-
-Modüller yazıldıktan sonra Semih bunları `app.py`'a bağlayacak. Plan:
-
-| Metot | Endpoint | İçi |
+| Metot | Endpoint | Açıklama |
 |---|---|---|
-| GET | `/api/roads` | `road_network.get_road_network()` |
-| GET | `/api/worker` | `worker_service.get_state()` |
-| POST | `/api/worker/collect/<bin_id>` | `worker_service.mark_collected(bin_id)` (404 kontrolü Semih'te) |
-| POST | `/api/worker/reset` | `worker_service.reset_to_depot()` |
+| GET  | `/api/route/road` | Yol ağı + Dijkstra rotası, `road_path` ile |
+| GET  | `/api/roads` | Yol ağı node + edge + bin eşlemesi (görselleştirme için) |
+| GET  | `/api/worker/status` | Worker mevcut durumu |
+| GET  | `/api/worker/route` | Worker konumundan yeni rota |
+| POST | `/api/worker/start` | İlk hedefe yönlendir |
+| POST | `/api/worker/collect/<bin_id>` | Kutuyu toplandı işaretle + DB'de sıfırla (404 kontrolü dahil) |
+| POST | `/api/worker/reset` | Worker'ı depoya döndür |
 
-Ulaş modülleri PR olarak açtığında Semih 30 dk içinde endpoint'leri ekler.
+### 3.5 [P2] Testler (`test_api.py`) ✅
 
-### 3.5 [P2] Testler (`test_api.py`)
-
-- [ ] `pytest` veya basit `unittest` ile başla.
-- [ ] `/api/health`, `/api/bins`, `/api/simulate/random`, `/api/route`, `/api/reset` mutlu yol testi.
-- [ ] `POST /api/simulate/BOGUS` → 404 testi.
-- [ ] `POST /api/external-data` ile `fill_level=200` → 400 testi.
-- [ ] `POST /api/electronics-signal/apply?t=5.0` → B01 fill=50, alarm=1 testi (eşik geçişi).
-- [ ] `POST /api/electronics-signal/apply?t=20` → 400 testi (aralık dışı).
-- [ ] Demo senaryosu: reset → simulate/demo → route → en az 3 stop dönmeli.
-- [ ] Görevli çakışma testi: `worker_service` aktifken `simulate/random` yine çağrılabilmeli (backend bloklamıyor; frontend bloklasın).
+- [x] `test_api.py` (152 satır, 9 test).
+- [x] `/api/health`, `/api/bins`, `/api/simulate`, `/api/route`, `/api/route/road` mutlu yol testleri.
+- [x] `/api/worker/status`, `/api/worker/route`, `/api/worker/start`, `/api/worker/reset` testleri.
+- [x] **Tüm 9 test PASS** (Semih endpoint'leri bağladıktan sonra).
+- [ ] **İyileştirme** (opsiyonel): 404/400 hata testleri (`/api/simulate/BOGUS`, `/api/external-data` `fill_level=200`, `/api/electronics-signal/apply?t=20`). Şu an sadece happy path.
 
 ---
 
-### Bu Hafta / Önümüzdeki Hafta (öneri)
+### Bu Hafta / Önümüzdeki Hafta (güncel)
 
 | Hafta | İshak | Ulaş |
 |---|---|---|
-| **Bu hafta** | §2.1 (P0 acil id eşleştirme), §2.2 (P0 demo butonları) | §3.3 (P0 worker_service) |
-| **Önümüzdeki hafta** | §2.3 (P1 dashboard), §2.5 (P1 EEM slider) | §3.1 + §3.2 (P1 yol ağı + rota) |
-| **Demo haftası** | §2.4 (P1 marker cila), §2.6 (P2 tarayıcı) | §3.5 (P2 testler) |
+| **Bu hafta** | §2.7 frontend'i `/api/route/road`'a geçir (H5 çözülür) | §3.2 önceliklendirme (kritik önce) — opsiyonel |
+| **Önümüzdeki hafta** | §2.6 tarayıcı uyumluluğu testi | §3.5 hata yolu testleri — opsiyonel |
+| **Demo haftası** | Ekran görüntüleri + demo provası | Demo provası + test çıktısı |
 
 ---
 
@@ -203,13 +202,14 @@ Ulaş modülleri PR olarak açtığında Semih 30 dk içinde endpoint'leri ekler
 
 | # | Hata | Sorumlu | Çözüm |
 |---|---|---|---|
-| H1 | Harita markerları bazen güncellenmiyor | İshak | Marker refresh ve cache buster (`?v=` artır). |
-| H3 | Görevli aktifken simülasyon çakışıyor | Ulaş | Worker state machine + frontend buton disable. |
-| H4 | Rota çizgisi simülasyon sonrası silinmiyor | İshak | Yeni rota öncesi eski `routeLayer`'ı `map.removeLayer` ile temizle. |
-| H5 | Araç düz çizgi ile gidiyor (yolu takip etmiyor) | Ulaş + İshak | Rota çıktısına `path_coordinates` ekle, frontend polyline'ı bu listeden çizsin. |
-| H6 | Tarayıcı cache eski `script.js` kullanıyor | İshak | `index.html` içindeki `?v=N` parametresini her UI değişikliğinde artır. |
+| H5 | Araç düz çizgi ile gidiyor (yolu takip etmiyor) | İshak | Backend tarafı hazır (`/api/route/road` + `road_path`). Frontend §2.7'yi uygulasın. |
 
-> H2 (`step.name` undefined) Semih tarafında çözüldü — bin satırı zaten `name` alanını döndürüyor.
+> **Çözülen hatalar (referans için):**
+> - H1: Marker refresh düzeldi, dashboard sinyaliyle senkron çalışıyor. (İshak)
+> - H2: `step.name` zaten DB'den dönüyor. (Semih)
+> - H3: Worker state machine yazıldı, çakışma yok. (Ulaş)
+> - H4: `routeLayer` her yeni rotada `map.removeLayer` ile temizleniyor. (İshak — `script.js:98`)
+> - H6: Cache buster otomatik `?v={Date.now()}`. (İshak — `index.html:117-127`)
 
 ---
 

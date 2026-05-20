@@ -31,10 +31,54 @@
 
 | Metot | Endpoint | Açıklama |
 |---|---|---|
-| GET | `/api/route?start_x=&start_y=&start_name=` | Verilen konumdan Manhattan + en yakın komşu rotası |
+| GET | `/api/route?start_x=&start_y=&start_name=` | Manhattan + en yakın komşu (basit, düz çizgi) |
+| GET | `/api/route/road?start_x=&start_y=&start_name=` | **Yol ağı üzerinden Dijkstra.** Çıktıda `road_path` (waypoint listesi) ve her durak için `path_nodes_from_previous`. |
 
-> `path_coordinates` alanı yol ağı (Ulaş) tamamlandığında eklenecektir.
-> `/api/worker*` ve `/api/roads` endpointleri Ulaş'ın sorumluluğundadır.
+## Yol Ağı
+
+| Metot | Endpoint | Açıklama |
+|---|---|---|
+| GET | `/api/roads` | Yol ağının `nodes`, `edges` ve `bin_node_map` bilgileri. Frontend harita üstünde yolları çizmek için kullanır. |
+
+## Görevli (Worker)
+
+Singleton bir worker servisi. State sunucu ömrü boyunca bellek içinde yaşar (restart'ta sıfırlanır — kabul edilebilir).
+
+| Metot | Endpoint | Açıklama |
+|---|---|---|
+| GET  | `/api/worker/status` | Mevcut durum: `id`, `x`/`y`, `status` (idle/working/collecting/route_ready), `current_target`, `completed_bins`, `last_route`. |
+| GET  | `/api/worker/route` | Mevcut kutular için yeni rota hesaplar (worker konumundan başlayarak). `status='route_ready'` yapar. |
+| POST | `/api/worker/start` | Rotayı hesaplayıp ilk hedefe ayarlar (`status='working'`). Boş rota varsa idle döner. |
+| POST | `/api/worker/collect/<bin_id>` | Belirtilen kutuyu toplandı olarak işaretler, DB'de `fill_level=0`'a sıfırlar. 404: bilinmeyen `bin_id`. |
+| POST | `/api/worker/reset` | Worker'ı depoya (0,0) döndürür, `completed_bins` listesini boşaltır. |
+
+### Örnek: `GET /api/route/road`
+
+```json
+{
+  "start": { "x": 0, "y": 0, "name": "Depo", "road_node": "DEPOT" },
+  "route": [
+    {
+      "bin_id": "B05",
+      "name": "Rektörlük",
+      "x": 50, "y": 25,
+      "current_status": "critical",
+      "road_node": "CENTER",
+      "road_distance_from_previous": 75.04,
+      "path_nodes_from_previous": ["DEPOT", "GATE", "PARKING", "CAFETERIA", "CENTER"]
+    }
+  ],
+  "road_path": [
+    { "node_id": "DEPOT",     "name": "Depo",      "x": 0,  "y": 0  },
+    { "node_id": "GATE",      "name": "Ana Giriş", "x": 10, "y": 10 },
+    { "node_id": "PARKING",   "name": "Otopark",   "x": 60, "y": 15 },
+    { "node_id": "CAFETERIA", "name": "Yemekhane", "x": 55, "y": 35 },
+    { "node_id": "CENTER",    "name": "Öğr. Mrkz.", "x": 45, "y": 60 }
+  ],
+  "total_distance": 174.7,
+  "message": "Gerçek yol ağına göre rota hesaplandı."
+}
+```
 
 ## EEM Elektronik Sinyali (LTspice)
 
