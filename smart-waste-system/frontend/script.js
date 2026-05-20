@@ -88,10 +88,13 @@ function moveWorker(toX, toY, steps = 40) {
     });
 }
 
-// ─── ROTA HESAPLAMA (görevli konumundan) ─────────────────────────
+// ─── ROTA HESAPLAMA (yol ağı üzerinden) ──────────────────────────
+// Ulaş'ın road_network modülünü kullanır: /api/route/road
+// Dijkstra ile en kısa yolu döndürür, road_path waypoint listesi içerir.
 async function calculateRoute() {
     try {
-        const url = `${API_BASE}/route?start_x=${workerPos.x}&start_y=${workerPos.y}&start_name=${workerPos.x===0&&workerPos.y===0?'Depo':'Araç+Konumu'}`;
+        const startName = (workerPos.x === 0 && workerPos.y === 0) ? 'Depo' : 'Araç+Konumu';
+        const url = `${API_BASE}/route/road?start_x=${workerPos.x}&start_y=${workerPos.y}&start_name=${startName}`;
         const response = await fetch(url);
         const data = await response.json();
 
@@ -104,23 +107,36 @@ async function calculateRoute() {
             return;
         }
 
-        // Çizgi: araç konumu → kutular
+        // road_path waypoints'ten node id → koordinat lookup'ı kur
+        const nodeMap = {};
+        (data.road_path || []).forEach(n => { nodeMap[n.node_id] = n; });
+
+        // Polyline: worker pozisyonundan başla, her kutu için yol segmentini ekle, son kutuya hop yap
         const latlngs = [[workerPos.y, workerPos.x]];
+        data.route.forEach(step => {
+            (step.path_nodes_from_previous || []).forEach(nid => {
+                const node = nodeMap[nid];
+                if (node) latlngs.push([node.y, node.x]);
+            });
+            latlngs.push([step.y, step.x]);
+        });
+
         let html = `<h3>Rota Özeti</h3>`;
-        html += `<p>📍 Başlangıç: <b>${data.start.name}</b></p>`;
-        html += `<p>📏 Toplam Mesafe: <b>${data.total_distance}</b></p><ul>`;
+        html += `<p>📍 Başlangıç: <b>${data.start.name}</b> <span class="muted">(${data.start.road_node})</span></p>`;
+        html += `<p>📏 Toplam Yol Mesafesi: <b>${data.total_distance}</b> m</p>`;
+        html += `<p class="muted" style="font-size:0.75rem">${data.message || ''}</p><ul>`;
 
         data.route.forEach((step, i) => {
-            latlngs.push([step.y, step.x]);
             const s = step.current_status === 'critical' ? '🔴 Kritik' : '🟡 Toplanmalı';
-            html += `<li>${i+1}. ${step.bin_id} – ${step.name} (${s})</li>`;
+            const seg = step.road_distance_from_previous != null ? ` <span class="muted">+${step.road_distance_from_previous}m</span>` : '';
+            html += `<li>${i+1}. ${step.bin_id} – ${step.name} (${s})${seg}</li>`;
         });
 
         html += `</ul>`;
         infoDiv.innerHTML = html;
 
         routeLayer = L.polyline(latlngs, {
-            color: '#3498db', weight: 3, opacity: 0.85, dashArray: '8, 6'
+            color: '#3498db', weight: 4, opacity: 0.9
         }).addTo(map);
         map.fitBounds(routeLayer.getBounds(), { padding: [20, 20] });
 
@@ -130,98 +146,123 @@ async function calculateRoute() {
 }
 
 // ─── GÖREVLİ DÖNGÜSÜ ─────────────────────────────────────────────
+// Yol ağı üzerinde: her döngüde /api/route/road çağrılır, ilk hedef
+// için path_nodes_from_previous waypoint'lerini sırayla yürür, sonra
+// kutuya off-road hop yapar ve toplama yapar. Yeni kritik kutu çıkarsa
+// bir sonraki iterasyonda otomatik dahil olur (rota baştan hesaplandığı için).
 async function runWorkerCycle() {
     if (workerBusy) { log('⚠️ Araç zaten çalışıyor!'); return; }
     workerBusy = true;
     const statusEl = document.getElementById('worker-status-val');
     if (statusEl) statusEl.textContent = 'Turda';
 
-    // Güncel kutuları çek
-    let bins;
-    try {
-        const r = await fetch(`${API_BASE}/bins`);
-        bins = await r.json();
-    } catch { workerBusy = false; return; }
-
-    const toCollect = bins
-        .filter(b => b.current_status === 'critical' || b.current_status === 'needs_collection')
-        .sort((a, b) => {
-            const p = { critical: 0, needs_collection: 1 };
-            return p[a.current_status] - p[b.current_status];
-        });
-
-    if (toCollect.length === 0) {
-        log('✅ Toplanacak kutu yok. Depoya dönülüyor...');
-        await moveWorker(0, 0);
-        workerMarker.setPopupContent('<b>🚛 Atık Toplama Aracı</b><br>Depoda bekliyor');
-        if (statusEl) statusEl.textContent = 'Depoda';
-        workerBusy = false;
-        return;
-    }
-
-    log(`📋 ${toCollect.length} kutu sıralandı. Tur başlıyor...`);
-
     const visited = new Set();
+    const MAX_ITER = 20;
 
-    for (let i = 0; i < toCollect.length; i++) {
-        const bin = toCollect[i];
-        if (visited.has(bin.bin_id)) continue;
-
-        // Yolda yeni kritik kutu ekle
-        if (i > 0) {
-            try {
-                const r = await fetch(`${API_BASE}/bins`);
-                const fresh = await r.json();
-                fresh.filter(b =>
-                    b.current_status === 'critical' &&
-                    !visited.has(b.bin_id) &&
-                    !toCollect.some(tc => tc.bin_id === b.bin_id)
-                ).forEach(b => {
-                    toCollect.splice(i, 0, b);
-                    log(`🚨 Yeni kritik: ${b.bin_id} (${b.name}) sıraya eklendi!`);
-                });
-            } catch { /* sessiz */ }
+    for (let iter = 0; iter < MAX_ITER; iter++) {
+        // Mevcut konumdan yeni rotayı al
+        let route;
+        try {
+            const r = await fetch(`${API_BASE}/route/road?start_x=${workerPos.x}&start_y=${workerPos.y}&start_name=Ara%C3%A7`);
+            route = await r.json();
+        } catch (e) {
+            console.error('Rota fetch hatası:', e);
+            break;
         }
 
-        log(`🚛 → ${bin.bin_id} (${bin.name}) %${bin.current_fill_level} doluluk`);
-        workerMarker.setPopupContent(`<b>🚛 Hareket Ediyor</b><br>Hedef: ${bin.bin_id} – ${bin.name}`);
+        if (!route.route || route.route.length === 0) {
+            log('✅ Toplanacak kutu kalmadı.');
+            break;
+        }
 
-        await moveWorker(bin.x, bin.y);
-        visited.add(bin.bin_id);
+        // İlk ziyaret edilmemiş kutu (Dijkstra zaten en yakını başa koyar)
+        const target = route.route.find(b => !visited.has(b.bin_id));
+        if (!target) { log('Tüm aday kutular ziyaret edildi.'); break; }
 
-        // Rotayı anlık güncelle (araç yeni konumdan)
-        await calculateRoute();
+        if (iter === 0) log(`📋 ${route.route.length} kutu sıralandı. Tur başlıyor...`);
+        log(`🚛 → ${target.bin_id} (${target.name}) %${target.current_fill_level} doluluk · ${target.road_distance_from_previous}m`);
+        workerMarker.setPopupContent(`<b>🚛 Hareket Ediyor</b><br>Hedef: ${target.bin_id} – ${target.name}`);
 
-        log(`✅ ${bin.bin_id} toplandı! Kutu sıfırlanıyor...`);
-        workerMarker.setPopupContent(`<b>🚛 Toplama Yapılıyor</b><br>${bin.bin_id} – ${bin.name}`);
+        // road_path'ten node lookup kur (rota değişebilir, her iterasyonda taze)
+        const nodeMap = {};
+        (route.road_path || []).forEach(n => { nodeMap[n.node_id] = n; });
 
-        // Kutuyu sıfırla
+        // Görsel rotayı güncelle (canlı polyline)
+        await drawRouteFromData(route);
+
+        // Yol ağı waypoint'lerini sırayla yürü
+        const waypoints = target.path_nodes_from_previous || [];
+        for (let i = 0; i < waypoints.length; i++) {
+            const node = nodeMap[waypoints[i]];
+            if (!node) continue;
+            // Aynı pozisyondaysak atla (no-op move)
+            if (Math.abs(node.x - workerPos.x) < 0.01 && Math.abs(node.y - workerPos.y) < 0.01) continue;
+            await moveWorker(node.x, node.y);
+        }
+
+        // Off-road hop: kutunun fiili konumuna
+        if (Math.abs(target.x - workerPos.x) >= 0.01 || Math.abs(target.y - workerPos.y) >= 0.01) {
+            await moveWorker(target.x, target.y);
+        }
+
+        visited.add(target.bin_id);
+
+        // Toplama
+        log(`✅ ${target.bin_id} toplandı! Kutu sıfırlanıyor...`);
+        workerMarker.setPopupContent(`<b>🚛 Toplama Yapılıyor</b><br>${target.bin_id} – ${target.name}`);
+
         try {
             await fetch(`${API_BASE}/external-data`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    bin_id: bin.bin_id,
+                    bin_id: target.bin_id,
                     fill_level: 0,
-                    timestamp: new Date().toISOString().slice(0, 19)
-                })
+                    timestamp: new Date().toISOString().slice(0, 19),
+                }),
             });
         } catch { /* sessiz */ }
 
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 600));
+        lastBinData = null;
         await fetchBins();
     }
 
     // Depoya dön
-    log(`🏁 Tüm kutular toplandı. Depoya dönülüyor...`);
+    log('🏁 Tur tamamlandı. Depoya dönülüyor...');
     if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
-    await moveWorker(0, 0);
+    if (Math.abs(workerPos.x) >= 0.01 || Math.abs(workerPos.y) >= 0.01) {
+        await moveWorker(0, 0);
+    }
     workerMarker.setPopupContent('<b>🚛 Atık Toplama Aracı</b><br>Depoda bekliyor. Sonraki tur için hazır.');
     log('🏠 Araç depoya döndü.');
 
     document.getElementById('route-panel').innerHTML = `<p>✅ Tur tamamlandı.</p>`;
     if (statusEl) statusEl.textContent = 'Depoda';
     workerBusy = false;
+}
+
+// Önceden alınmış route verisinden polyline çizer (worker cycle içinde
+// fetch yapmadan tekrar tekrar çağrılabilir).
+async function drawRouteFromData(data) {
+    if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+    if (!data || !data.route || data.route.length === 0) return;
+
+    const nodeMap = {};
+    (data.road_path || []).forEach(n => { nodeMap[n.node_id] = n; });
+
+    const latlngs = [[workerPos.y, workerPos.x]];
+    data.route.forEach(step => {
+        (step.path_nodes_from_previous || []).forEach(nid => {
+            const node = nodeMap[nid];
+            if (node) latlngs.push([node.y, node.x]);
+        });
+        latlngs.push([step.y, step.x]);
+    });
+
+    routeLayer = L.polyline(latlngs, {
+        color: '#3498db', weight: 4, opacity: 0.9
+    }).addTo(map);
 }
 
 // ─── VERİ GÜNCELLEME ─────────────────────────────────────────────
@@ -362,7 +403,45 @@ function setWorkerSpeed(value) {
     if (label) label.textContent = labels[speedVal] || 'Normal';
 }
 
+// ─── YOL AĞI ARKA PLANI ──────────────────────────────────────────
+// Ulaş'ın road_network'ünü gri çizgilerle göster — worker'ın neden
+// belirli güzergahları izlediği görsel olarak anlaşılır olsun diye.
+async function drawRoadNetworkBackground() {
+    try {
+        const r = await fetch(`${API_BASE}/roads`);
+        const data = await r.json();
+        const nodes = data.nodes || {};
+        const edges = data.edges || {};
+
+        const drawn = new Set();
+        Object.entries(edges).forEach(([from, neighbors]) => {
+            neighbors.forEach(to => {
+                const key = [from, to].sort().join('|');
+                if (drawn.has(key)) return;
+                drawn.add(key);
+                const a = nodes[from];
+                const b = nodes[to];
+                if (!a || !b) return;
+                L.polyline([[a.y, a.x], [b.y, b.x]], {
+                    color: '#7a7f8e', weight: 2, opacity: 0.35
+                }).addTo(map);
+            });
+        });
+
+        Object.entries(nodes).forEach(([nid, node]) => {
+            if (nid === 'DEPOT') return; // depo zaten ayrı marker
+            L.circleMarker([node.y, node.x], {
+                radius: 3, color: '#888', fillColor: '#555',
+                fillOpacity: 0.55, weight: 1
+            }).bindTooltip(`${node.name} (${nid})`, { permanent: false }).addTo(map);
+        });
+    } catch (e) {
+        console.error('Yol ağı çizim hatası:', e);
+    }
+}
+
 // ─── OTOMATİK GÜNCELLEME ─────────────────────────────────────────
+drawRoadNetworkBackground();
 fetchBins();
 setInterval(() => { lastBinData = null; fetchBins(); }, 3000); // her 3sn zorla kontrol
 log('🟢 Sistem hazır. Veriler bekleniyor...');

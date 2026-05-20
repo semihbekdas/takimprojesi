@@ -22,7 +22,7 @@
 | Görevli servisi (`worker_service.py`) | ✅ State machine (idle/working/collecting), singleton | Ulaş |
 | `/api/roads`, `/api/route/road`, `/api/worker*` | ✅ 7 endpoint bağlandı (Semih) | Ulaş + Semih |
 | Test dosyaları (`test_api.py`) | ✅ 9 testin tümü PASS | Ulaş |
-| Frontend `/api/route/road`'a geçişi | ❌ Hâlâ düz `/api/route` çağırıyor (H5) | İshak |
+| Frontend `/api/route/road`'a geçişi | ✅ Worker yol ağını takip ediyor + yol arka planı gri çiziliyor | Semih |
 
 ---
 
@@ -108,15 +108,14 @@ Rapor için katma değer: "Frontend EEM ekibinin gerçek LTspice çıkışını 
 - [ ] Chrome / Firefox / Safari'de açıp marker rengi, animasyon, layout testi yap.
 - [x] Cache buster otomatik (`?v={Date.now()}`) — `index.html` script blok'unda.
 
-### 2.7 [P1] Rotayı yol ağına bağla — YENİ
+### 2.7 [P1] Rotayı yol ağına bağla ✅
 
-Ulaş'ın yol ağı endpoint'i artık canlı (`GET /api/route/road`). Frontend hâlâ düz çizgi rotaya (`/api/route`) çağrı atıyor. Geçiş yapılmalı (Bilinen Hata H5'in çözümü):
+H5 hatası çözüldü. Yapılanlar:
 
-- [ ] [script.js:94](../frontend/script.js#L94) — `${API_BASE}/route?...` → `${API_BASE}/route/road?...`.
-- [ ] Yanıttaki `data.road_path` listesini latlng dizisine çevir. Her waypoint `{node_id, name, x, y}` formatında.
-- [ ] `L.polyline(roadPathLatLngs, ...)` — kesik çizgi yerine düz, solid renkli çiz.
-- [ ] Worker animasyonu da `road_path` üstünden gitsin (`moveWorker` artık tek hedefe değil, ara waypoint'lere sırayla hareket etmeli).
-- [ ] Opsiyonel: `GET /api/roads` ile yol ağını arka plan olarak göster (gri ince çizgiler).
+- [x] `calculateRoute()` artık `/api/route/road` çağırıyor; polyline her durağın `path_nodes_from_previous` waypoint'lerinden + son hop'tan oluşuyor (`script.js:91-148`).
+- [x] `runWorkerCycle()` her iterasyonda taze rota çekiyor, ilk ziyaret edilmemiş hedefin yol ağı node'larını sırayla yürüyor, ardından off-road hop ile kutuya gidip topluyor (`script.js:151-237`).
+- [x] Polyline `dashArray` kaldırıldı, solid mavi.
+- [x] **Bonus**: `/api/roads` ile gri yol ağı arka planı çizildi — kullanıcı worker'ın neden bu güzergahı izlediğini görsel olarak anlıyor (`script.js:413-446`).
 
 ---
 
@@ -200,16 +199,16 @@ Modüller `app.py`'a bağlandı. Tam liste:
 
 ## 5. Bilinen Hatalar (Açık)
 
-| # | Hata | Sorumlu | Çözüm |
-|---|---|---|---|
-| H5 | Araç düz çizgi ile gidiyor (yolu takip etmiyor) | İshak | Backend tarafı hazır (`/api/route/road` + `road_path`). Frontend §2.7'yi uygulasın. |
+**Tüm bilinen hatalar çözüldü.** Referans için:
 
-> **Çözülen hatalar (referans için):**
-> - H1: Marker refresh düzeldi, dashboard sinyaliyle senkron çalışıyor. (İshak)
-> - H2: `step.name` zaten DB'den dönüyor. (Semih)
-> - H3: Worker state machine yazıldı, çakışma yok. (Ulaş)
-> - H4: `routeLayer` her yeni rotada `map.removeLayer` ile temizleniyor. (İshak — `script.js:98`)
-> - H6: Cache buster otomatik `?v={Date.now()}`. (İshak — `index.html:117-127`)
+| # | Hata | Çözen | Yer |
+|---|---|---|---|
+| H1 | Harita markerları bazen güncellenmiyor | İshak | `script.js:230-244` (fetchBins + dashboard sync) |
+| H2 | `step.name` undefined | Semih | DB satırı zaten `name` döndürüyor |
+| H3 | Görevli aktifken simülasyon çakışıyor | Ulaş | `worker_service` state machine |
+| H4 | Rota çizgisi simülasyon sonrası silinmiyor | İshak | `script.js:98` (`map.removeLayer(routeLayer)`) |
+| H5 | Araç düz çizgi ile gidiyor (yolu takip etmiyor) | Semih + Ulaş | `script.js:91-237` + `/api/route/road` (Dijkstra waypoint'leri) |
+| H6 | Tarayıcı cache eski script.js kullanıyor | İshak | `index.html:117-127` (`?v={Date.now()}`) |
 
 ---
 
