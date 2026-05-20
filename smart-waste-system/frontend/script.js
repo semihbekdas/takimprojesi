@@ -226,6 +226,12 @@ async function runWorkerCycle() {
     if (Math.abs(workerPos.x) >= 0.01 || Math.abs(workerPos.y) >= 0.01) {
         await moveWorker(0, 0);
     }
+    // Backend worker state'ini idle'a çek (Codex caveat'ı: complete_bin
+    // status='working' bırakıyor; tur bitince finish_route çağırma yolu yok,
+    // bu yüzden reset ile temizliyoruz).
+    try {
+        await fetch(`${API_BASE}/worker/reset`, { method: 'POST' });
+    } catch { /* sessiz */ }
     workerMarker.setPopupContent('<b>🚛 Atık Toplama Aracı</b><br>Depoda bekliyor. Sonraki tur için hazır.');
     log('🏠 Araç depoya döndü.');
 
