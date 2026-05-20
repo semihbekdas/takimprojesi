@@ -103,9 +103,21 @@ EEM ekibinin sağladığı LTspice transient çıkışını B01 kutusu üzerinde
 
 Rapor için katma değer: "Frontend EEM ekibinin gerçek LTspice çıkışını canlı tüketiyor" gösterimi.
 
-### 2.6 [P2] Tarayıcı uyumluluğu
+### 2.6 [P2] Tarayıcı uyumluluğu — DEMO ÖNCESİ KALAN İŞ
 
-- [ ] Chrome / Firefox / Safari'de açıp marker rengi, animasyon, layout testi yap.
+**Sorumlu: İshak.** Bu, geriye kalan tek aktif iş.
+
+- [ ] **Chrome**'da `frontend/index.html` aç (`python3 -m http.server 8000` üstünden), bütün akışı dene: demo veri, rota göster, görevli gönder, EEM slider, kutu sıfırla.
+- [ ] Aynı kontrolü **Firefox**'ta tekrarla.
+- [ ] Aynı kontrolü **Safari**'de tekrarla.
+- [ ] Kontrol noktaları:
+  - Marker renkleri ve `pulse` animasyonu (kritik kutular)
+  - EEM canvas grafiği (eşik çizgisi + sinyal eğrisi)
+  - Polyline mavi solid çiziliyor mu, yol ağını takip ediyor mu
+  - Görevli (🚛) waypoint'leri sırayla yürüyor mu, off-road hop yapıyor mu
+  - Popup'taki "Bu kutuyu sıfırla" butonu her tarayıcıda tetikleniyor mu
+  - Slider'lar (hız + EEM) tepki veriyor mu
+- [ ] Layout farklı ekran genişliklerinde (1280px, 1440px, 1920px) bozulmuyor.
 - [x] Cache buster otomatik (`?v={Date.now()}`) — `index.html` script blok'unda.
 
 ### 2.7 [P1] Rotayı yol ağına bağla ✅
@@ -178,14 +190,21 @@ Modüller `app.py`'a bağlandı. Tam liste:
 
 ---
 
-## 4. Ortak / Demo Hazırlığı
+## 4. Ortak / Demo Hazırlığı — KALAN İŞLER
 
-| Sorumlu | İş |
-|---|---|
-| Hepsi | Demo öncesi `POST /api/reset` çalıştırıp temiz başlangıç. |
-| İshak | Demo videosu / ekran görüntüleri (yeşil → sarı → kırmızı → rota → boşaltma akışı). |
-| Ulaş | Test çıktılarını `docs/test_results.md` dosyasına ekle. |
-| Semih | Hata raporları gelirse backend tarafında bug fix. |
+Kodlama büyük ölçüde bitti. Demo öncesi yapılacaklar:
+
+| # | İş | Sorumlu | Detay |
+|---|---|---|---|
+| D1 | Tarayıcı uyumluluğu (§2.6) | **İshak** | Chrome / Firefox / Safari'de tüm akışı test et. Kontrol listesi §2.6'da. |
+| D2 | Ekran görüntüleri | **İshak** | Akış: temiz başlangıç → demo veri → marker renkleri → rota çizimi → görevli hareketi → EEM slider eşik geçişi → toplama sonrası yeşil dönüş. En az 6–8 kare. |
+| D3 | Demo videosu (opsiyonel) | İshak | Ekran kaydı + kısa anlatım. Yoksa ekran görüntüleri yeterli. |
+| D4 | Test çıktısı (`docs/test_results.md`) | **Ulaş** | `python3 test_api.py` çıktısını ve manuel senaryo (reset → demo → route → worker → EEM apply) sonuçlarını dosyaya yaz. |
+| D5 | Demo öncesi `POST /api/reset` | **Hepsi** | Demo başlamadan önce DB'yi temizle. İlk slayttan önce `curl -X POST http://127.0.0.1:5001/api/reset`. |
+| D6 | Backend acil bug fix | **Semih** | Demo günü çıkabilecek hatalara müdahale. Şu an kod tarafında bekleyen iş yok. |
+| D7 | Sunum anlatımı | **Hepsi** | [demo_scenario.md](demo_scenario.md)'daki akışa göre rolleri paylaş. |
+
+**Semih için not:** Kod tarafında yapılacak iş kalmadı. Demo günü gözlem + hızlı müdahale.
 
 ### Demo Kabul Kriterleri (uçtan uca)
 
