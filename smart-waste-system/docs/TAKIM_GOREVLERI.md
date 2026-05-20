@@ -105,20 +105,51 @@ Rapor için katma değer: "Frontend EEM ekibinin gerçek LTspice çıkışını 
 
 ### 2.6 [P2] Tarayıcı uyumluluğu — DEMO ÖNCESİ KALAN İŞ
 
-**Sorumlu: İshak.** Bu, geriye kalan tek aktif iş.
+**Sorumlu: İshak.** Bu, geriye kalan tek aktif kod-dışı iş.
 
-- [ ] **Chrome**'da `frontend/index.html` aç (`python3 -m http.server 8000` üstünden), bütün akışı dene: demo veri, rota göster, görevli gönder, EEM slider, kutu sıfırla.
-- [ ] Aynı kontrolü **Firefox**'ta tekrarla.
-- [ ] Aynı kontrolü **Safari**'de tekrarla.
-- [ ] Kontrol noktaları:
-  - Marker renkleri ve `pulse` animasyonu (kritik kutular)
-  - EEM canvas grafiği (eşik çizgisi + sinyal eğrisi)
-  - Polyline mavi solid çiziliyor mu, yol ağını takip ediyor mu
-  - Görevli (🚛) waypoint'leri sırayla yürüyor mu, off-road hop yapıyor mu
-  - Popup'taki "Bu kutuyu sıfırla" butonu her tarayıcıda tetikleniyor mu
-  - Slider'lar (hız + EEM) tepki veriyor mu
-- [ ] Layout farklı ekran genişliklerinde (1280px, 1440px, 1920px) bozulmuyor.
+> Backend API tarafı Codex tarafından canlı doğrulandı. Aşağıdaki 12 adım **görsel/etkileşimsel** doğrulamayı kapsıyor — pure browser testi.
+
+#### Setup
+
+```bash
+# Terminal 1
+cd smart-waste-system/backend && source venv/bin/activate && python3 app.py
+
+# Terminal 2
+cd smart-waste-system/frontend && python3 -m http.server 8000
+```
+
+Açılacak URL: `http://localhost:8000`
+
+#### Demo checklist (her tarayıcıda tekrar et: Chrome → Firefox → Safari)
+
+- [ ] **1. İlk yükleme:** Dashboard yükleniyor, harita görünüyor, 8 marker yerinde, console'da hata yok.
+- [ ] **2. Sıfırla:** `Sıfırla` butonuna bas → tüm kutular yeşil/normal'a dönüyor.
+- [ ] **3. Demo verisi:** `Demo Verisi Üret` → en az 1 kritik (🔴) + 1 needs_collection (🟡) görünüyor. Yetmezse `Step` ile tekrar bas.
+- [ ] **4. Marker animasyonu:** Kritik kutularda `pulse` halka efekti çalışıyor mu.
+- [ ] **5. Rota Göster:** `Rota Göster` butonu → mavi solid çizgi yol ağını takip ediyor, **rota paneli kırmızı durakları sarılardan ÖNCE listeliyor** (critical-first fix doğrulaması).
+- [ ] **6. Görevliyi Gönder:** `Görevliyi Gönder` → 🚛 aracı düz çizgi değil **gri yol ağı üzerinden** waypoint'lere uğrayarak hareket ediyor.
+- [ ] **7. Toplama:** Araç kutuya varınca → kutu yeşile dönüyor, doluluk %0 oluyor, "Aktivite Logu"nda "toplandı" mesajı görünüyor.
+- [ ] **8. Tur sonu:** Tüm kutular toplandıktan sonra araç depoya geri dönüyor, dashboard'taki "Araç Durumu" `Depoda` oluyor.
+- [ ] **9. EEM slider — düşük t:** B01 EEM slider t=0–4 arası → B01 yeşil, popup'ta `⚡ EEM` rozeti var.
+- [ ] **10. EEM slider — eşik:** Slider t≈5.0 → B01 **sarıya dönüyor** (50% doluluk, eşik geçişi).
+- [ ] **11. EEM slider — kritik:** Slider t=8–10 → B01 **kırmızıya dönüyor** (80%+ doluluk).
+- [ ] **12. Cache busting:** Sayfayı yenile (Cmd-R / Ctrl-F5) → her şey hâlâ temiz yükleniyor, eski script.js cache'lenmiyor.
+
+#### Layout testi
+
+- [ ] 1280px / 1440px / 1920px ekran genişliklerinde sidebar + harita bozulmuyor.
+
+#### Edge cases (zaman varsa)
+
+- [ ] Bütün kutular yeşilken `Rota Göster` → "Toplanması gereken kutu yok" mesajı.
+- [ ] Görevli aktifken `Görevliyi Gönder`'e tekrar bas → "Araç zaten çalışıyor!" log.
+- [ ] Popup'taki `Bu kutuyu sıfırla` butonu her tarayıcıda tetikleniyor mu.
+
+#### Otomatik (referans için, manuel test gerekmez)
+
 - [x] Cache buster otomatik (`?v={Date.now()}`) — `index.html` script blok'unda.
+- [x] Backend API testleri — Codex doğruladı (rota, collect, reset, kritik öncelik).
 
 ### 2.7 [P1] Rotayı yol ağına bağla ✅
 
@@ -196,15 +227,29 @@ Kodlama büyük ölçüde bitti. Demo öncesi yapılacaklar:
 
 | # | İş | Sorumlu | Detay |
 |---|---|---|---|
-| D1 | Tarayıcı uyumluluğu (§2.6) | **İshak** | Chrome / Firefox / Safari'de tüm akışı test et. Kontrol listesi §2.6'da. |
+| D1 | Tarayıcı uyumluluğu (§2.6) | **İshak** | §2.6'daki 12 adımlık demo checklist'i Chrome / Firefox / Safari'de tekrar et. |
 | D2 | Ekran görüntüleri | **İshak** | Akış: temiz başlangıç → demo veri → marker renkleri → rota çizimi → görevli hareketi → EEM slider eşik geçişi → toplama sonrası yeşil dönüş. En az 6–8 kare. |
 | D3 | Demo videosu (opsiyonel) | İshak | Ekran kaydı + kısa anlatım. Yoksa ekran görüntüleri yeterli. |
-| D4 | Test çıktısı (`docs/test_results.md`) | **Ulaş** | `python3 test_api.py` çıktısını ve manuel senaryo (reset → demo → route → worker → EEM apply) sonuçlarını dosyaya yaz. |
+| D4 | Test çıktısı (`docs/test_results.md`) | **Ulaş** | `python3 test_api.py` çıktısını ve manuel senaryo (reset → demo → route → worker → EEM apply) sonuçlarını dosyaya yaz. Codex'in yaptığı API doğrulamasını referans alabilir. |
 | D5 | Demo öncesi `POST /api/reset` | **Hepsi** | Demo başlamadan önce DB'yi temizle. İlk slayttan önce `curl -X POST http://127.0.0.1:5001/api/reset`. |
 | D6 | Backend acil bug fix | **Semih** | Demo günü çıkabilecek hatalara müdahale. Şu an kod tarafında bekleyen iş yok. |
 | D7 | Sunum anlatımı | **Hepsi** | [demo_scenario.md](demo_scenario.md)'daki akışa göre rolleri paylaş. |
 
 **Semih için not:** Kod tarafında yapılacak iş kalmadı. Demo günü gözlem + hızlı müdahale.
+**Ulaş için not:** Backend tarafı Codex tarafından canlı doğrulandı (9/9 PASS + manuel senaryo). Tek iş D4 (test_results.md).
+**İshak için not:** Senin tarafın en kritik. §2.6'daki 12 adımı ciddi al; özellikle 5/6/10-11 (critical-first, yol takip, EEM eşik) demo'nun savunma noktaları.
+
+### Backend API doğrulama notu (Codex)
+
+Codex backend'i canlı çalıştırıp şunları teyit etti:
+- `/api/health` ✅
+- `/api/reset` → temiz 8-normal state ✅
+- `/api/route/road` → kritik kutu, daha yakın sarıdan ÖNCE dönüyor ✅
+- `/api/worker/collect/<bin_id>` → bin sıfırlanıyor + worker.completed güncelleniyor ✅
+- `/api/worker/reset` → worker idle'a dönüyor ✅
+- Tüm kritikler toplandıktan sonra rota sadece kalan sarıyı döndürüyor ✅
+
+**Önemli:** Demo'da `/api/route` (eski, saf Manhattan) DEĞİL; frontend'in zaten kullandığı `/api/route/road` kanonik endpoint. Eski endpoint geriye dönük uyumluluk için tutuluyor, gösterilmemeli.
 
 ### Demo Kabul Kriterleri (uçtan uca)
 

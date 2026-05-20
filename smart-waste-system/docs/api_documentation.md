@@ -31,8 +31,8 @@
 
 | Metot | Endpoint | Açıklama |
 |---|---|---|
-| GET | `/api/route?start_x=&start_y=&start_name=` | Manhattan + en yakın komşu (basit, düz çizgi) |
-| GET | `/api/route/road?start_x=&start_y=&start_name=` | **Yol ağı üzerinden Dijkstra.** Çıktıda `road_path` (waypoint listesi) ve her durak için `path_nodes_from_previous`. |
+| GET | `/api/route?start_x=&start_y=&start_name=` | ⚠️ Legacy: Manhattan + saf en yakın komşu, critical-first **yok**. Geriye dönük uyumluluk için tutuluyor. |
+| GET | `/api/route/road?start_x=&start_y=&start_name=` | ✅ **Kanonik demo endpoint.** Yol ağı üzerinden Dijkstra + critical-first öncelik. Çıktıda `road_path` (waypoint listesi) ve her durak için `path_nodes_from_previous`. |
 
 ## Yol Ağı
 
