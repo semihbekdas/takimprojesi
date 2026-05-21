@@ -9,6 +9,10 @@ BINS = [
     ('B06', 'Kız Yurdu',             'Dormitory', 25, 25),
     ('B07', 'Erkek Yurdu',           'Dormitory', 75, 75),
     ('B08', 'Otopark / Merkez',      'Parking',   50, 50),
+    ('B09', 'Sağlık Merkezi',        'Health',    25, 50),
+    ('B10', 'Laboratuvar Bloğu',     'Lab',       40, 90),
+    ('B11', 'Sosyal Alan',           'Social',    90, 60),
+    ('B12', 'Bakım Birimi',          'Service',   90, 30),
 ]
 
 def insert_initial_bins():

@@ -45,7 +45,9 @@ def generate_step_data(bin_id, current_fill_level, min_step=3, max_step=12):
 def generate_demo_distribution(bins):
     """Return a list of sensor payloads guaranteeing at least one critical and
     two needs_collection bins, with the rest normal. Order is shuffled so the
-    same physical bins don't always land in the same bucket."""
+    same physical bins don't always land in the same bucket. Existing fill
+    levels are never reduced; collection/reset are the only paths that empty a
+    bin during the demo."""
     if not bins:
         return []
 
@@ -60,5 +62,6 @@ def generate_demo_distribution(bins):
             fill = random.randint(55, 75)
         else:
             fill = random.randint(5, 40)
+        fill = max(int(bin_row.get("current_fill_level", 0) or 0), fill)
         payloads.append(_build_data(bin_row["bin_id"], fill))
     return payloads

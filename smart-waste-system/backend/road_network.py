@@ -5,38 +5,52 @@ from math import sqrt
 ROAD_NODES = {
     "DEPOT": {"x": 0, "y": 0, "name": "Depo"},
     "GATE": {"x": 10, "y": 10, "name": "Ana Giriş"},
-    "ENGINEERING": {"x": 20, "y": 25, "name": "Mühendislik"},
-    "LIBRARY": {"x": 35, "y": 40, "name": "Kütüphane"},
-    "CAFETERIA": {"x": 55, "y": 35, "name": "Yemekhane"},
-    "SPORTS": {"x": 70, "y": 55, "name": "Spor Salonu"},
-    "DORM": {"x": 85, "y": 70, "name": "Yurtlar"},
-    "PARKING": {"x": 60, "y": 15, "name": "Otopark"},
-    "CENTER": {"x": 45, "y": 60, "name": "Öğrenci Merkezi"},
+    "B01_NODE": {"x": 25, "y": 75, "name": "Mühendislik Fakültesi"},
+    "B02_NODE": {"x": 50, "y": 75, "name": "Kütüphane"},
+    "B03_NODE": {"x": 75, "y": 50, "name": "Yemekhane"},
+    "B04_NODE": {"x": 75, "y": 25, "name": "Spor Salonu"},
+    "B05_NODE": {"x": 50, "y": 25, "name": "Rektörlük"},
+    "B06_NODE": {"x": 25, "y": 25, "name": "Kız Yurdu"},
+    "B07_NODE": {"x": 75, "y": 75, "name": "Erkek Yurdu"},
+    "B08_NODE": {"x": 50, "y": 50, "name": "Otopark / Merkez"},
+    "B09_NODE": {"x": 25, "y": 50, "name": "Sağlık Merkezi"},
+    "B10_NODE": {"x": 40, "y": 90, "name": "Laboratuvar Bloğu"},
+    "B11_NODE": {"x": 90, "y": 60, "name": "Sosyal Alan"},
+    "B12_NODE": {"x": 90, "y": 30, "name": "Bakım Birimi"},
 }
 
 
 ROAD_EDGES = {
     "DEPOT": ["GATE"],
-    "GATE": ["DEPOT", "ENGINEERING", "PARKING"],
-    "ENGINEERING": ["GATE", "LIBRARY"],
-    "LIBRARY": ["ENGINEERING", "CAFETERIA", "CENTER"],
-    "CAFETERIA": ["LIBRARY", "SPORTS", "PARKING"],
-    "SPORTS": ["CAFETERIA", "DORM", "CENTER"],
-    "DORM": ["SPORTS"],
-    "PARKING": ["GATE", "CAFETERIA"],
-    "CENTER": ["LIBRARY", "SPORTS"],
+    "GATE": ["DEPOT", "B06_NODE"],
+    "B06_NODE": ["GATE", "B09_NODE", "B05_NODE", "B08_NODE"],
+    "B09_NODE": ["B06_NODE", "B01_NODE", "B08_NODE"],
+    "B01_NODE": ["B09_NODE", "B02_NODE", "B08_NODE", "B10_NODE"],
+    "B10_NODE": ["B01_NODE", "B02_NODE"],
+    "B05_NODE": ["B06_NODE", "B04_NODE", "B08_NODE", "B03_NODE"],
+    "B04_NODE": ["B05_NODE", "B12_NODE", "B03_NODE", "B08_NODE"],
+    "B12_NODE": ["B04_NODE", "B03_NODE", "B11_NODE"],
+    "B08_NODE": ["B06_NODE", "B09_NODE", "B01_NODE", "B05_NODE", "B04_NODE", "B02_NODE", "B03_NODE", "B07_NODE", "B11_NODE"],
+    "B03_NODE": ["B05_NODE", "B04_NODE", "B12_NODE", "B07_NODE", "B08_NODE", "B11_NODE"],
+    "B02_NODE": ["B01_NODE", "B10_NODE", "B07_NODE", "B08_NODE"],
+    "B07_NODE": ["B02_NODE", "B03_NODE", "B08_NODE", "B11_NODE"],
+    "B11_NODE": ["B08_NODE", "B03_NODE", "B07_NODE", "B12_NODE"],
 }
 
 
 BIN_NODE_MAP = {
-    "B01": "CENTER",
-    "B02": "CENTER",
-    "B03": "SPORTS",
-    "B04": "PARKING",
-    "B05": "PARKING",
-    "B06": "ENGINEERING",
-    "B07": "DORM",
-    "B08": "CENTER",
+    "B01": "B01_NODE",
+    "B02": "B02_NODE",
+    "B03": "B03_NODE",
+    "B04": "B04_NODE",
+    "B05": "B05_NODE",
+    "B06": "B06_NODE",
+    "B07": "B07_NODE",
+    "B08": "B08_NODE",
+    "B09": "B09_NODE",
+    "B10": "B10_NODE",
+    "B11": "B11_NODE",
+    "B12": "B12_NODE",
 }
 
 
@@ -249,14 +263,14 @@ def calculate_real_road_route(bins, start_x=0, start_y=0, start_name="Depo"):
 
 def remove_duplicate_path_points(points):
     cleaned = []
-    seen = set()
+    last_key = None
 
     for point in points:
         key = (point["node_id"], point["x"], point["y"])
 
-        if key not in seen:
+        if key != last_key:
             cleaned.append(point)
-            seen.add(key)
+            last_key = key
 
     return cleaned
 

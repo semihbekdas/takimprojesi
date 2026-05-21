@@ -24,6 +24,20 @@ def _persist(data):
     database.update_bin_status(data)
 
 
+def _is_eem_bin(bin_id):
+    return str(bin_id).upper() == ELECTRONICS_DEFAULT_BIN
+
+
+def _simulated_bins():
+    return [b for b in database.get_all_bins() if not _is_eem_bin(b.get('bin_id'))]
+
+
+def _eem_only_error():
+    return jsonify({
+        "error": f"{ELECTRONICS_DEFAULT_BIN} only accepts EEM signal data; use /api/electronics-signal/apply or /api/simulate/electronics"
+    }), 400
+
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "ok"})
@@ -62,7 +76,7 @@ def simulate_random():
 
 
 def _simulate_random():
-    bins = database.get_all_bins()
+    bins = _simulated_bins()
     generated = []
     for bin_row in bins:
         data = sensor_simulator.generate_monotonic_random_data(
@@ -71,12 +85,17 @@ def _simulate_random():
         )
         _persist(data)
         generated.append(data)
-    return jsonify({"mode": "random", "count": len(generated), "data": generated})
+    return jsonify({
+        "mode": "random",
+        "excluded_bins": [ELECTRONICS_DEFAULT_BIN],
+        "count": len(generated),
+        "data": generated,
+    })
 
 
 @app.route('/api/simulate/step', methods=['POST'])
 def simulate_step():
-    bins = database.get_all_bins()
+    bins = _simulated_bins()
     generated = []
     for bin_row in bins:
         data = sensor_simulator.generate_step_data(
@@ -85,22 +104,34 @@ def simulate_step():
         )
         _persist(data)
         generated.append(data)
-    return jsonify({"mode": "step", "count": len(generated), "data": generated})
+    return jsonify({
+        "mode": "step",
+        "excluded_bins": [ELECTRONICS_DEFAULT_BIN],
+        "count": len(generated),
+        "data": generated,
+    })
 
 
 @app.route('/api/simulate/demo', methods=['POST'])
 def simulate_demo():
-    bins = database.get_all_bins()
+    bins = _simulated_bins()
     payloads = sensor_simulator.generate_demo_distribution(bins)
     for data in payloads:
         _persist(data)
-    return jsonify({"mode": "demo", "count": len(payloads), "data": payloads})
+    return jsonify({
+        "mode": "demo",
+        "excluded_bins": [ELECTRONICS_DEFAULT_BIN],
+        "count": len(payloads),
+        "data": payloads,
+    })
 
 
 @app.route('/api/simulate/<bin_id>', methods=['POST'])
 def simulate_one(bin_id):
     if database.get_bin(bin_id) is None:
         return jsonify({"error": f"bin_id '{bin_id}' not found"}), 404
+    if _is_eem_bin(bin_id):
+        return _eem_only_error()
     data = sensor_simulator.generate_random_data(bin_id)
     _persist(data)
     return jsonify({"message": f"Simulation completed for {bin_id}", "data": data})
@@ -126,6 +157,8 @@ def receive_external_data():
 
     if database.get_bin(bin_id) is None:
         return jsonify({"error": f"bin_id '{bin_id}' not found"}), 404
+    if _is_eem_bin(bin_id):
+        return _eem_only_error()
 
     voltage = round((fill_level / 100) * 5, 2)
     alarm = 1 if fill_level >= 50 else 0
@@ -192,6 +225,8 @@ def electronics_signal_apply():
 
     if database.get_bin(bin_id) is None:
         return jsonify({"error": f"bin_id '{bin_id}' not found"}), 404
+    if not _is_eem_bin(bin_id):
+        return jsonify({"error": f"EEM signal can only be applied to {ELECTRONICS_DEFAULT_BIN}"}), 400
 
     voltage = electronics_signal.get_voltage_at(t)
     fill_level = electronics_signal.to_fill_level(voltage)
@@ -223,6 +258,8 @@ def simulate_electronics():
 
     if database.get_bin(bin_id) is None:
         return jsonify({"error": f"bin_id '{bin_id}' not found"}), 404
+    if not _is_eem_bin(bin_id):
+        return jsonify({"error": f"EEM signal can only be applied to {ELECTRONICS_DEFAULT_BIN}"}), 400
 
     series = electronics_signal.get_series(samples)
     t_min, t_max = electronics_signal.time_bounds()
@@ -303,6 +340,31 @@ def get_roads():
         "nodes": road_network.ROAD_NODES,
         "edges": road_network.ROAD_EDGES,
         "bin_node_map": road_network.BIN_NODE_MAP,
+    })
+
+
+@app.route('/api/road-path', methods=['GET'])
+def get_road_path():
+    """Two road-network points arasındaki en kısa yolu döndürür.
+    Frontend bunu araçları depoya veya bir road_node'a düz çizgiyle değil,
+    yol ağı üzerinden götürmek için kullanır."""
+    try:
+        start_x = float(request.args.get('start_x', 0))
+        start_y = float(request.args.get('start_y', 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "start_x and start_y must be numbers"}), 400
+
+    target_node = request.args.get('target_node', 'DEPOT')
+    start_node = road_network.find_nearest_node(start_x, start_y)
+    try:
+        path = road_network.dijkstra_shortest_path(start_node, target_node)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify({
+        "start": {"x": start_x, "y": start_y, "road_node": start_node},
+        "target_node": target_node,
+        **path,
     })
 
 
