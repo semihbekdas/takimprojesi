@@ -32,6 +32,11 @@ def generate_random_data(bin_id):
     return _build_data(bin_id, random.randint(0, 100))
 
 
+def generate_monotonic_random_data(bin_id, current_fill_level):
+    current_fill_level = max(0, min(100, int(current_fill_level or 0)))
+    return _build_data(bin_id, random.randint(current_fill_level, 100))
+
+
 def generate_step_data(bin_id, current_fill_level, min_step=3, max_step=12):
     increment = random.randint(min_step, max_step)
     return _build_data(bin_id, current_fill_level + increment)

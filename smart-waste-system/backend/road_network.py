@@ -29,14 +29,14 @@ ROAD_EDGES = {
 
 
 BIN_NODE_MAP = {
-    "B01": "ENGINEERING",
-    "B02": "LIBRARY",
-    "B03": "CAFETERIA",
-    "B04": "SPORTS",
-    "B05": "CENTER",
-    "B06": "PARKING",
+    "B01": "CENTER",
+    "B02": "CENTER",
+    "B03": "SPORTS",
+    "B04": "PARKING",
+    "B05": "PARKING",
+    "B06": "ENGINEERING",
     "B07": "DORM",
-    "B08": "GATE",
+    "B08": "CENTER",
 }
 
 
@@ -48,6 +48,10 @@ def road_distance(node_a, node_b):
     point_a = ROAD_NODES[node_a]
     point_b = ROAD_NODES[node_b]
     return euclidean_distance(point_a, point_b)
+
+
+def bin_access_distance(node_id, bin_data):
+    return euclidean_distance(ROAD_NODES[node_id], bin_data)
 
 
 def find_nearest_node(x, y):
@@ -193,20 +197,24 @@ def calculate_real_road_route(bins, start_x=0, start_y=0, start_name="Depo"):
         best_path = None
         best_distance = float("inf")
         best_priority = float("inf")
+        best_access_distance = 0
 
         for bin_item in remaining:
             target_node = get_bin_road_node(bin_item)
             path_result = dijkstra_shortest_path(current_node, target_node)
             priority = status_priority.get(bin_item["current_status"], 99)
+            access_distance = bin_access_distance(target_node, bin_item)
+            candidate_distance = path_result["distance"] + access_distance * 2
 
             if (
                 priority < best_priority
-                or (priority == best_priority and path_result["distance"] < best_distance)
+                or (priority == best_priority and candidate_distance < best_distance)
             ):
                 best_priority = priority
-                best_distance = path_result["distance"]
+                best_distance = candidate_distance
                 best_path = path_result
                 best_bin = bin_item
+                best_access_distance = access_distance
 
         target_node = get_bin_road_node(best_bin)
 
@@ -214,6 +222,8 @@ def calculate_real_road_route(bins, start_x=0, start_y=0, start_name="Depo"):
             **best_bin,
             "road_node": target_node,
             "road_distance_from_previous": round(best_distance, 2),
+            "road_only_distance_from_previous": best_path["distance"],
+            "access_distance": round(best_access_distance, 2),
             "path_nodes_from_previous": best_path["path_nodes"],
         })
 

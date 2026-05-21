@@ -65,7 +65,10 @@ def _simulate_random():
     bins = database.get_all_bins()
     generated = []
     for bin_row in bins:
-        data = sensor_simulator.generate_random_data(bin_row['bin_id'])
+        data = sensor_simulator.generate_monotonic_random_data(
+            bin_row['bin_id'],
+            bin_row.get('current_fill_level', 0) or 0,
+        )
         _persist(data)
         generated.append(data)
     return jsonify({"mode": "random", "count": len(generated), "data": generated})

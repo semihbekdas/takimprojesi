@@ -424,6 +424,15 @@ async function runStepSimulation() {
     } catch (e) { console.error(e); }
 }
 
+async function runAutoSimulationTick() {
+    try {
+        await fetch(`${API_BASE}/simulate/step`, { method: 'POST' });
+        lastBinData = null;
+        await fetchBins();
+        log('⏱ Oto simülasyon: doluluklar artırıldı.');
+    } catch (e) { console.error(e); }
+}
+
 async function resetSystem() {
     try {
         await fetch(`${API_BASE}/reset`, { method: 'POST' });
@@ -621,6 +630,24 @@ if (eemApplyAllBtn) eemApplyAllBtn.addEventListener('click', applyFullEemSignal)
 fetchEemSignal();
 
 // ─── BUTONLAR ────────────────────────────────────────────────────
+let autoSimTimer = null;
+const autoToggleBtn = document.getElementById('btn-auto-toggle');
+if (autoToggleBtn) {
+    autoToggleBtn.addEventListener('click', async () => {
+        if (autoSimTimer) {
+            clearInterval(autoSimTimer);
+            autoSimTimer = null;
+            autoToggleBtn.textContent = '▶ Oto Simülasyon Başlat';
+            log('⏸ Oto simülasyon durduruldu.');
+            return;
+        }
+        await runAutoSimulationTick();
+        autoSimTimer = setInterval(runAutoSimulationTick, 3000);
+        autoToggleBtn.textContent = '⏸ Oto Simülasyon Durdur';
+        log('▶ Oto simülasyon başlatıldı: doluluk sadece artar.');
+    });
+}
+
 const demoBtn = document.getElementById('btn-demo');
 if (demoBtn) demoBtn.addEventListener('click', runDemoSimulation);
 
