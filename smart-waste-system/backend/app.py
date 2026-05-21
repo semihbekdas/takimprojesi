@@ -267,7 +267,10 @@ def get_route():
 def get_road_route():
     """Yol ağı üzerinden Dijkstra ile rota. Düz Manhattan yerine gerçek
     yolu takip eder; çıktıda `road_path` (waypoint listesi) ve her durak
-    için `path_nodes_from_previous` döner."""
+    için `path_nodes_from_previous` döner.
+
+    Opsiyonel: ?bin_ids=B01,B02,... ile sadece belirli kutular için rota
+    hesaplanır (çoklu araç senaryosu)."""
     try:
         start_x = float(request.args.get('start_x', 0))
         start_y = float(request.args.get('start_y', 0))
@@ -276,6 +279,11 @@ def get_road_route():
     start_name = request.args.get('start_name', 'Depo')
 
     bins = database.get_all_bins()
+    bin_ids_param = request.args.get('bin_ids')
+    if bin_ids_param:
+        allowed = {x.strip() for x in bin_ids_param.split(',') if x.strip()}
+        bins = [b for b in bins if b['bin_id'] in allowed]
+
     return jsonify(road_network.calculate_real_road_route(
         bins=bins,
         start_x=start_x,
