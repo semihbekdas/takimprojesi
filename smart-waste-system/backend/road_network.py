@@ -179,6 +179,31 @@ def filter_bins_for_collection(bins):
     return result
 
 
+def find_bins_on_path(path_nodes, remaining_bins, exclude_bin):
+    """Return collection bins whose road node is already on the chosen path.
+
+    The last node is excluded because it belongs to the selected target. The
+    order follows the vehicle's travel direction so route insertion stays
+    visually natural.
+    """
+    if not path_nodes or len(path_nodes) < 2:
+        return []
+
+    path_order = {node_id: idx for idx, node_id in enumerate(path_nodes[:-1])}
+    on_path = []
+
+    for bin_item in remaining_bins:
+        if bin_item is exclude_bin:
+            continue
+
+        bin_node = get_bin_road_node(bin_item)
+        if bin_node in path_order:
+            on_path.append((path_order[bin_node], bin_item))
+
+    on_path.sort(key=lambda pair: pair[0])
+    return [bin_item for _, bin_item in on_path]
+
+
 def calculate_real_road_route(bins, start_x=0, start_y=0, start_name="Depo"):
     collection_bins = filter_bins_for_collection(bins)
 
@@ -211,7 +236,6 @@ def calculate_real_road_route(bins, start_x=0, start_y=0, start_name="Depo"):
         best_path = None
         best_distance = float("inf")
         best_priority = float("inf")
-        best_access_distance = 0
 
         for bin_item in remaining:
             target_node = get_bin_road_node(bin_item)
@@ -228,21 +252,51 @@ def calculate_real_road_route(bins, start_x=0, start_y=0, start_name="Depo"):
                 best_distance = candidate_distance
                 best_path = path_result
                 best_bin = bin_item
-                best_access_distance = access_distance
 
         target_node = get_bin_road_node(best_bin)
+
+        on_path_bins = find_bins_on_path(
+            best_path["path_nodes"],
+            remaining,
+            exclude_bin=best_bin,
+        )
+
+        for passing_bin in on_path_bins:
+            passing_node = get_bin_road_node(passing_bin)
+            sub_path = dijkstra_shortest_path(current_node, passing_node)
+            access_distance = bin_access_distance(passing_node, passing_bin)
+            segment_distance = sub_path["distance"] + access_distance * 2
+
+            route.append({
+                **passing_bin,
+                "road_node": passing_node,
+                "road_distance_from_previous": round(segment_distance, 2),
+                "road_only_distance_from_previous": sub_path["distance"],
+                "access_distance": round(access_distance, 2),
+                "path_nodes_from_previous": sub_path["path_nodes"],
+                "picked_up_on_route": True,
+            })
+
+            full_road_path.extend(sub_path["path_coordinates"])
+            total_distance += segment_distance
+            current_node = passing_node
+            remaining.remove(passing_bin)
+
+        final_path = dijkstra_shortest_path(current_node, target_node)
+        final_access_distance = bin_access_distance(target_node, best_bin)
+        final_distance = final_path["distance"] + final_access_distance * 2
 
         route.append({
             **best_bin,
             "road_node": target_node,
-            "road_distance_from_previous": round(best_distance, 2),
-            "road_only_distance_from_previous": best_path["distance"],
-            "access_distance": round(best_access_distance, 2),
-            "path_nodes_from_previous": best_path["path_nodes"],
+            "road_distance_from_previous": round(final_distance, 2),
+            "road_only_distance_from_previous": final_path["distance"],
+            "access_distance": round(final_access_distance, 2),
+            "path_nodes_from_previous": final_path["path_nodes"],
         })
 
-        full_road_path.extend(best_path["path_coordinates"])
-        total_distance += best_distance
+        full_road_path.extend(final_path["path_coordinates"])
+        total_distance += final_distance
 
         current_node = target_node
         remaining.remove(best_bin)

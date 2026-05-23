@@ -252,7 +252,8 @@ async function calculateRoute() {
         data.route.forEach((step, i) => {
             const s = step.current_status === 'critical' ? '🔴 Kritik' : '🟡 Toplanmalı';
             const seg = step.road_distance_from_previous != null ? ` <span class="muted">+${step.road_distance_from_previous}m</span>` : '';
-            html += `<li>${i + 1}. ${step.bin_id} – ${step.name} (${s})${seg}</li>`;
+            const pickupTag = step.picked_up_on_route ? ' <span class="muted">(yol üstü)</span>' : '';
+            html += `<li>${i + 1}. ${step.bin_id} – ${step.name} (${s})${pickupTag}${seg}</li>`;
         });
 
         html += `</ul>`;
