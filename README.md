@@ -173,36 +173,36 @@ Bu sinyali yazılım tarafında **B01 kutusu (Mühendislik Fakültesi)** için "
 
 ```
 takimprojesi/
-├── README.md                        # (bu dosya)
-├── Draft2.txt                       # EEM LTspice transient çıktısı (ham)
-├── smart-waste-system/
-├── backend/
-│   ├── app.py                       # Flask uygulaması + tüm endpointler
-│   ├── database.py                  # SQLite bağlantısı + sorgular
-│   ├── seed_data.py                 # 8 kutu başlangıç verisi (idempotent)
-│   ├── sensor_simulator.py          # Random / step / demo veri üretimi
-│   ├── electronics_signal.py        # EEM LTspice sinyal okuyucu (§4)
-│   ├── route_optimizer.py           # Manhattan + en yakın komşu
-│   ├── data/
-│   │   └── electronics_signal.tsv   # Draft2.txt'in kopyası (EEM çıktısı)
-│   ├── requirements.txt
-│   └── venv/                        # (gitignored)
-│
-├── frontend/
-│   ├── index.html                   # Sayfa iskeleti
-│   ├── style.css                    # Koyu tema, kartlar, marker stilleri
-│   ├── script.js                    # Leaflet, fetch, animasyon
-│   └── campus_map.png               # Kampüs arka plan (image overlay)
-│
-├── database/
-│   └── waste.db                     # SQLite — runtime'da oluşur (gitignored)
-│
-└── docs/
-    ├── TAKIM_GOREVLERI.md           # Canlı iş listesi (İshak / Ulaş)
-    ├── api_documentation.md         # Tüm endpointler + örnek yanıtlar
-    ├── bm_random_sensor_proje_plani.md  # Yüksek seviye proje planı
-    ├── demo_scenario.md             # Sunum akışı + sunum metni
-    └── report_notes.md              # Ara/final rapor için Türkçe metinler
+├── README.md                            # (bu dosya)
+├── Draft2.txt                           # EEM LTspice transient çıktısı (ham)
+└── smart-waste-system/
+    ├── backend/
+    │   ├── app.py                       # Flask uygulaması + tüm endpointler
+    │   ├── database.py                  # SQLite bağlantısı + sorgular
+    │   ├── seed_data.py                 # 8 kutu başlangıç verisi (idempotent)
+    │   ├── sensor_simulator.py          # Random / step / demo veri üretimi
+    │   ├── electronics_signal.py        # EEM LTspice sinyal okuyucu (§4)
+    │   ├── route_optimizer.py           # Manhattan + en yakın komşu
+    │   ├── data/
+    │   │   └── electronics_signal.tsv   # Draft2.txt'in kopyası (EEM çıktısı)
+    │   ├── requirements.txt
+    │   └── venv/                        # (gitignored)
+    │
+    ├── frontend/
+    │   ├── index.html                   # Sayfa iskeleti
+    │   ├── style.css                    # Koyu tema, kartlar, marker stilleri
+    │   ├── script.js                    # Leaflet, fetch, animasyon
+    │   └── campus_map.png               # Kampüs arka plan (image overlay)
+    │
+    ├── database/
+    │   └── waste.db                     # SQLite — runtime'da oluşur (gitignored)
+    │
+    └── docs/
+        ├── TAKIM_GOREVLERI.md           # Canlı iş listesi (İshak / Ulaş)
+        ├── api_documentation.md         # Tüm endpointler + örnek yanıtlar
+        ├── bm_random_sensor_proje_plani.md  # Yüksek seviye proje planı
+        ├── demo_scenario.md             # Sunum akışı + sunum metni
+        └── report_notes.md              # Ara/final rapor için Türkçe metinler
 ```
 
 ---
