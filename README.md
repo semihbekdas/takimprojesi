@@ -172,7 +172,10 @@ Bu sinyali yazılım tarafında **B01 kutusu (Mühendislik Fakültesi)** için "
 ## 5. Klasör Yapısı
 
 ```
-smart-waste-system/
+takimprojesi/
+├── README.md                        # (bu dosya)
+├── Draft2.txt                       # EEM LTspice transient çıktısı (ham)
+├── smart-waste-system/
 ├── backend/
 │   ├── app.py                       # Flask uygulaması + tüm endpointler
 │   ├── database.py                  # SQLite bağlantısı + sorgular
@@ -195,7 +198,6 @@ smart-waste-system/
 │   └── waste.db                     # SQLite — runtime'da oluşur (gitignored)
 │
 └── docs/
-    ├── README                       # (bu dosya)
     ├── TAKIM_GOREVLERI.md           # Canlı iş listesi (İshak / Ulaş)
     ├── api_documentation.md         # Tüm endpointler + örnek yanıtlar
     ├── bm_random_sensor_proje_plani.md  # Yüksek seviye proje planı
@@ -273,7 +275,7 @@ curl -X POST "http://127.0.0.1:5001/api/electronics-signal/apply?t=5.0"
 
 ## 9. API Özeti
 
-Tam endpoint listesi, örnek yanıtlar ve hata kodları için: [docs/api_documentation.md](docs/api_documentation.md).
+Tam endpoint listesi, örnek yanıtlar ve hata kodları için: [docs/api_documentation.md](smart-waste-system/docs/api_documentation.md).
 
 | Kategori | Endpoint |
 |---|---|
@@ -297,15 +299,15 @@ Tam endpoint listesi, örnek yanıtlar ve hata kodları için: [docs/api_documen
 | **Buse Hatice Merdamert** (EEM) | LTspice transient analiz | ✅ Sinyal teslim edildi |
 | **Eılaf Kasem** (END) | Literatür, matematiksel model | ⏳ Aktif |
 
-İshak ve Ulaş'ın ayrıntılı görev listesi (öncelik markerlı, haftalık plan dahil): [docs/TAKIM_GOREVLERI.md](docs/TAKIM_GOREVLERI.md).
+İshak ve Ulaş'ın ayrıntılı görev listesi (öncelik markerlı, haftalık plan dahil): [docs/TAKIM_GOREVLERI.md](smart-waste-system/docs/TAKIM_GOREVLERI.md).
 
 ---
 
 ## 11. Demo Senaryosu
 
-Adım adım sunum akışı: [docs/demo_scenario.md](docs/demo_scenario.md).
+Adım adım sunum akışı: [docs/demo_scenario.md](smart-waste-system/docs/demo_scenario.md).
 
-**Kabul kriterleri** ([TAKIM_GOREVLERI.md §4](docs/TAKIM_GOREVLERI.md)):
+**Kabul kriterleri** ([TAKIM_GOREVLERI.md §4](smart-waste-system/docs/TAKIM_GOREVLERI.md)):
 
 1. Random/demo veri üretimi ile kutular anlık değişiyor.
 2. Doluluğa göre yeşil/sarı/kırmızı renk doğru gösteriliyor.
